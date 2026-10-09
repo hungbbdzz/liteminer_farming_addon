@@ -17,28 +17,44 @@ public class FTBUltimineCompat {
      * Checks if the player is currently holding the FTB Ultimine activation key.
      * Uses reflection for clean soft-dependency without crash risks.
      */
-    public static boolean isUltimineActive(ServerPlayer player) {
-        if (!isFTBUltimineLoaded()) {
+    public static boolean isUltimineActive(Player player) {
+        if (!isFTBUltimineLoaded() || player == null) {
             return false;
         }
         try {
-            Class<?> dataClass = Class.forName("dev.ftb.mods.ftbultimine.FTBUltiminePlayerData");
-            Method getMethod = dataClass.getMethod("get", Player.class);
-            Object data = getMethod.invoke(null, player);
-            if (data != null) {
-                try {
+            Class<?> ftbClass = Class.forName("dev.ftb.mods.ftbultimine.FTBUltimine");
+            Method getInstanceMethod = ftbClass.getMethod("getInstance");
+            Object instance = getInstanceMethod.invoke(null);
+            if (instance != null) {
+                Method getPlayerDataMethod = ftbClass.getMethod("getOrCreatePlayerData", Player.class);
+                Object data = getPlayerDataMethod.invoke(instance, player);
+                if (data != null) {
                     Method isPressed = data.getClass().getMethod("isPressed");
                     return (boolean) isPressed.invoke(data);
-                } catch (NoSuchMethodException e) {
-                    try {
-                        Method isActive = data.getClass().getMethod("isActive");
-                        return (boolean) isActive.invoke(data);
-                    } catch (NoSuchMethodException ignored) {
-                    }
                 }
             }
         } catch (Throwable t) {
             LiteMinerFarmingMod.LOGGER.debug("FTB Ultimine reflection check failed", t);
+        }
+        return false;
+    }
+
+    /**
+     * Checks if the client player is pressing the FTB Ultimine keybind.
+     */
+    public static boolean isUltimineClientActive() {
+        if (!isFTBUltimineLoaded()) {
+            return false;
+        }
+        try {
+            Class<?> clientClass = Class.forName("dev.ftb.mods.ftbultimine.client.FTBUltimineClient");
+            java.lang.reflect.Field keyBindField = clientClass.getField("keyBindUltimine");
+            net.minecraft.client.KeyMapping keyMapping = (net.minecraft.client.KeyMapping) keyBindField.get(null);
+            if (keyMapping != null) {
+                return keyMapping.isDown();
+            }
+        } catch (Throwable t) {
+            LiteMinerFarmingMod.LOGGER.debug("FTB Ultimine client reflection check failed", t);
         }
         return false;
     }

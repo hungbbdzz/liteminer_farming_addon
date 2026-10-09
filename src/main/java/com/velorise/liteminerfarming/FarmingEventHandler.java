@@ -52,10 +52,13 @@ public class FarmingEventHandler {
             active = FTBUltimineCompat.isUltimineActive(serverPlayer);
         }
 
-        if (!active && FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-            active = player.isShiftKeyDown();
-        } else if (!active && !LiteMinerCompat.isLiteMinerLoaded() && !FTBUltimineCompat.isFTBUltimineLoaded() && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-            active = true;
+        // If neither LiteMiner nor FTB Ultimine is loaded, use Standalone fallback
+        if (!LiteMinerCompat.isLiteMinerLoaded() && !FTBUltimineCompat.isFTBUltimineLoaded()) {
+            if (FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
+                active = player.isShiftKeyDown();
+            } else {
+                active = true;
+            }
         }
 
         if (!active) {

@@ -49,10 +49,15 @@ public class StandaloneHighlightRenderer {
             return;
         }
 
-        // Check if activation condition is met (Sneak / Shift by default in standalone mode)
-        boolean active = player.isShiftKeyDown();
-        if (!active && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-            active = true;
+        // Check activation condition: FTB Ultimine keybind, or Shift fallback in standalone mode
+        boolean active = false;
+        if (FTBUltimineCompat.isFTBUltimineLoaded()) {
+            active = FTBUltimineCompat.isUltimineClientActive();
+        } else {
+            active = player.isShiftKeyDown();
+            if (!active && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
+                active = true;
+            }
         }
 
         if (!active) {

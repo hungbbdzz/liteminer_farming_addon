@@ -9,7 +9,7 @@ version = mod_version
 group = mod_group_id
 
 base {
-    archivesName = "liteminer_farming_addon-1.21.1-neoforge"
+    archivesName = "vein_farming-1.21.1-neoforge"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
