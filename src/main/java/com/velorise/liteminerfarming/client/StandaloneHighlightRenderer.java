@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
@@ -250,10 +251,17 @@ public class StandaloneHighlightRenderer {
             Block mainCropBlock = FarmingManager.getCropBlock(heldItem);
             Block offCropBlock = FarmingManager.getCropBlock(offItem);
 
+            boolean evenIsMain = true;
+            if (ghostOffState != null) {
+                evenIsMain = FarmingManager.determineIntercropPhase(level, originSoilPos, player.getDirection(), mainCropBlock, offCropBlock);
+            }
+            boolean alternateOnX = (player.getDirection().getAxis() == Direction.Axis.Z);
+
             for (BlockPos pos : previewBlocks) {
                 BlockState stateToRender = ghostPlantState;
                 if (ghostOffState != null) {
-                    boolean isMainRow = FarmingManager.isMainCropRow(level, pos, originSoilPos, player.getDirection(), mainCropBlock, offCropBlock);
+                    int rowCoord = alternateOnX ? (pos.getX() - originSoilPos.getX()) : (pos.getZ() - originSoilPos.getZ());
+                    boolean isMainRow = (Math.floorMod(rowCoord, 2) == 0) ? evenIsMain : !evenIsMain;
                     stateToRender = isMainRow ? ghostPlantState : ghostOffState;
                 }
                 if (stateToRender == null) continue;

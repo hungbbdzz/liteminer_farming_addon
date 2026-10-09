@@ -1015,11 +1015,59 @@ public class FarmingManager {
     }
 
     /**
-     * Smart Context-Aware Intercropping:
-     * 1. Line Continuation: Follows the existing path forward/backward if crops are already planted along this line.
-     * 2. Neighbor Avoidance: Checks adjacent parallel rows to avoid planting the same crop next to existing neighbors.
-     * 3. Phased Alignment: Snaps into the parity phase of the closest existing crop in the field.
-     * 4. Default: Alternates parallel rows relative to origin if no existing crops are present.
+     * Determines whether even rows (relative to origin) should be the main hand crop
+     * using distance-weighted voting from existing crops in the vicinity.
+     * Prevents any two adjacent parallel rows from ever having the same crop type.
+     */
+    public static boolean determineIntercropPhase(
+            Level level,
+            BlockPos originPos,
+            Direction facing,
+            Block mainCropBlock,
+            Block offCropBlock
+    ) {
+        if (mainCropBlock == null || offCropBlock == null || level == null) {
+            return true;
+        }
+
+        boolean alternateOnX = (facing.getAxis() == Direction.Axis.Z);
+        int cropY = originPos.getY() + 1;
+        float score = 0.0f;
+
+        int originTransverse = alternateOnX ? originPos.getX() : originPos.getZ();
+
+        // Scan surrounding farm (transverse radius 12, axial radius 8)
+        for (int dt = -12; dt <= 12; dt++) {
+            int currentTransverse = originTransverse + dt;
+            int rowParity = Math.floorMod(dt, 2); // 0 = even, 1 = odd
+            float weight = 12.0f / (Math.abs(dt) + 1.0f); // Closer to clicked row = much stronger weight
+
+            for (int da = -8; da <= 8; da++) {
+                BlockState s = alternateOnX
+                        ? findCropAtColumn(level, currentTransverse, cropY, originPos.getZ() + da)
+                        : findCropAtColumn(level, originPos.getX() + da, cropY, currentTransverse);
+
+                if (isMatchingCrop(s, mainCropBlock)) {
+                    score += (rowParity == 0) ? weight : -weight;
+                } else if (isMatchingCrop(s, offCropBlock)) {
+                    score += (rowParity == 0) ? -weight : weight;
+                }
+            }
+        }
+
+        if (score > 0.0f) {
+            return true;
+        } else if (score < 0.0f) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Smart Context-Aware Intercropping with Strict Alternation:
+     * Guarantees Row(i) != Row(i + 1) for all rows, completely preventing adjacent same-crop collisions
+     * while aligning the entire field's phase with existing planted crops.
      */
     public static boolean isMainCropRow(
             Level level,
@@ -1030,63 +1078,11 @@ public class FarmingManager {
             Block offCropBlock
     ) {
         boolean alternateOnX = (facing.getAxis() == Direction.Axis.Z);
-
-        if (mainCropBlock != null && offCropBlock != null && level != null) {
-            int cropY = soilPos.getY() + 1;
-
-            // 1. Line continuation: check along this exact row line (search radius 8)
-            if (alternateOnX) {
-                int x = soilPos.getX();
-                for (int dz = -8; dz <= 8; dz++) {
-                    if (dz == 0) continue;
-                    BlockState s = findCropAtColumn(level, x, cropY, soilPos.getZ() + dz);
-                    if (isMatchingCrop(s, mainCropBlock)) return true;
-                    if (isMatchingCrop(s, offCropBlock)) return false;
-                }
-            } else {
-                int z = soilPos.getZ();
-                for (int dx = -8; dx <= 8; dx++) {
-                    if (dx == 0) continue;
-                    BlockState s = findCropAtColumn(level, soilPos.getX() + dx, cropY, z);
-                    if (isMatchingCrop(s, mainCropBlock)) return true;
-                    if (isMatchingCrop(s, offCropBlock)) return false;
-                }
-            }
-
-            // 2. Neighbor avoidance: find closest crop in adjacent rows to lock in phase
-            int curRow = alternateOnX ? soilPos.getX() : soilPos.getZ();
-            for (int dist = 1; dist <= 12; dist++) {
-                // Check dist rows to the left and right
-                int rowA = curRow - dist;
-                int rowB = curRow + dist;
-
-                for (int offset = -4; offset <= 4; offset++) {
-                    BlockState sA = alternateOnX
-                            ? findCropAtColumn(level, rowA, cropY, soilPos.getZ() + offset)
-                            : findCropAtColumn(level, soilPos.getX() + offset, cropY, rowA);
-                    if (isMatchingCrop(sA, mainCropBlock)) {
-                        return Math.floorMod(dist, 2) == 0;
-                    }
-                    if (isMatchingCrop(sA, offCropBlock)) {
-                        return Math.floorMod(dist, 2) != 0;
-                    }
-
-                    BlockState sB = alternateOnX
-                            ? findCropAtColumn(level, rowB, cropY, soilPos.getZ() + offset)
-                            : findCropAtColumn(level, soilPos.getX() + offset, cropY, rowB);
-                    if (isMatchingCrop(sB, mainCropBlock)) {
-                        return Math.floorMod(dist, 2) == 0;
-                    }
-                    if (isMatchingCrop(sB, offCropBlock)) {
-                        return Math.floorMod(dist, 2) != 0;
-                    }
-                }
-            }
-        }
-
-        // 3. Default alternation if no contextual crops are found in the vicinity
         int rowCoord = alternateOnX ? (soilPos.getX() - originPos.getX()) : (soilPos.getZ() - originPos.getZ());
-        return Math.floorMod(rowCoord, 2) == 0;
+        boolean isEven = Math.floorMod(rowCoord, 2) == 0;
+
+        boolean evenIsMain = determineIntercropPhase(level, originPos, facing, mainCropBlock, offCropBlock);
+        return isEven ? evenIsMain : !evenIsMain;
     }
 
     public static boolean isMainCropRow(BlockPos pos, BlockPos originPos, Direction facing) {
@@ -1157,6 +1153,13 @@ public class FarmingManager {
         Item offSeedItem = isIntercropping ? offHandStack.getItem() : null;
         Block offCropBlock = isIntercropping ? getCropBlock(offHandStack) : null;
 
+        boolean evenIsMain = true;
+        if (isIntercropping && offCropBlock != null) {
+            evenIsMain = determineIntercropPhase(level, originSoilPos, facing, mainCropBlock, offCropBlock);
+        }
+
+        boolean alternateOnX = (facing.getAxis() == Direction.Axis.Z);
+
         int plantedCount = 0;
         SoundType cropSound = null;
 
@@ -1167,7 +1170,8 @@ public class FarmingManager {
 
             boolean useMainCrop = true;
             if (isIntercropping && offCropBlock != null) {
-                useMainCrop = isMainCropRow(level, soilPos, originSoilPos, facing, mainCropBlock, offCropBlock);
+                int rowCoord = alternateOnX ? (soilPos.getX() - originSoilPos.getX()) : (soilPos.getZ() - originSoilPos.getZ());
+                useMainCrop = (Math.floorMod(rowCoord, 2) == 0) ? evenIsMain : !evenIsMain;
             }
 
             Item currentSeedItem = useMainCrop ? mainSeedItem : offSeedItem;
