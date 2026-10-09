@@ -1153,23 +1153,26 @@ public class FarmingManager {
                     stalk = stalk.above();
                 }
 
-                // Check horizontal adjacent columns
-                for (Direction dir : Direction.Plane.HORIZONTAL) {
-                    for (int dy = -1; dy <= 1; dy++) {
-                        BlockPos neighborPos = currentRoot.relative(dir).above(dy);
-                        if (visited.contains(neighborPos)) continue;
-                        if (Math.abs(neighborPos.getX() - startRoot.getX()) > radius
-                                || Math.abs(neighborPos.getZ() - startRoot.getZ()) > radius
-                                || Math.abs(neighborPos.getY() - startRoot.getY()) > 3) {
-                            continue;
-                        }
+                // Check 8 horizontal adjacent columns (including diagonals)
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            BlockPos neighborPos = currentRoot.offset(dx, dy, dz);
+                            if (visited.contains(neighborPos)) continue;
+                            if (Math.abs(neighborPos.getX() - startRoot.getX()) > radius
+                                    || Math.abs(neighborPos.getZ() - startRoot.getZ()) > radius
+                                    || Math.abs(neighborPos.getY() - startRoot.getY()) > 3) {
+                                continue;
+                            }
 
-                        BlockState neighborState = level.getBlockState(neighborPos);
-                        if (isSameColumnType(startState, neighborState)) {
-                            BlockPos neighborRoot = getColumnCropRoot(level, neighborPos);
-                            if (!visited.contains(neighborRoot)) {
-                                visited.add(neighborRoot);
-                                queue.add(neighborRoot);
+                            BlockState neighborState = level.getBlockState(neighborPos);
+                            if (isSameColumnType(startState, neighborState)) {
+                                BlockPos neighborRoot = getColumnCropRoot(level, neighborPos);
+                                if (!visited.contains(neighborRoot)) {
+                                    visited.add(neighborRoot);
+                                    queue.add(neighborRoot);
+                                }
                             }
                         }
                     }
@@ -1206,59 +1209,66 @@ public class FarmingManager {
                 if (curState.getBlock() instanceof NetherWartBlock && isMatureCrop(curState)) {
                     result.add(current);
                 }
-            } else {
-                // Pitcher Crop or standard Farmland crops
+                // Pitcher Crop or standard Farmland crops (STRICTLY same crop type!)
                 if (curState.is(Blocks.PITCHER_CROP) && isMatureCrop(curState)) {
                     result.add(current);
-                } else if (isMatureCrop(curState) && !isStem(curState)) {
+                } else if (curState.is(startState.getBlock()) && isMatureCrop(curState) && !isStem(curState)) {
                     result.add(current);
                 }
             }
 
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    BlockPos next = current.relative(dir).above(dy);
-                    if (visited.contains(next)) continue;
-                    if (Math.abs(next.getX() - actualCropPos.getX()) > radius
-                            || Math.abs(next.getZ() - actualCropPos.getZ()) > radius
-                            || Math.abs(next.getY() - actualCropPos.getY()) > 2) {
-                        continue;
-                    }
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos next = current.offset(dx, dy, dz);
+                        if (visited.contains(next)) continue;
+                        if (Math.abs(next.getX() - actualCropPos.getX()) > radius
+                                || Math.abs(next.getZ() - actualCropPos.getZ()) > radius
+                                || Math.abs(next.getY() - actualCropPos.getY()) > 2) {
+                            continue;
+                        }
 
-                    BlockState nextState = level.getBlockState(next);
-                    boolean canTraverse = false;
+                        BlockState nextState = level.getBlockState(next);
+                        boolean canTraverse = false;
 
-                    if (targetFruit) {
-                        // Only traverse connected fruits of the same type! Never traverse stems!
-                        if (nextState.is(startState.getBlock())) {
-                            canTraverse = true;
+                        if (targetFruit) {
+                            // Only traverse connected fruits of the same type! Never traverse stems!
+                            if (nextState.is(startState.getBlock())) {
+                                canTraverse = true;
+                            }
+                        } else if (targetBerry) {
+                            if (nextState.getBlock() instanceof SweetBerryBushBlock) {
+                                canTraverse = true;
+                            }
+                        } else if (targetVines) {
+                            if (nextState.getBlock() instanceof CaveVines || nextState.is(Blocks.CAVE_VINES) || nextState.is(Blocks.CAVE_VINES_PLANT)) {
+                                canTraverse = true;
+                            }
+                        } else if (targetCocoa) {
+                            if (nextState.getBlock() instanceof CocoaBlock) {
+                                canTraverse = true;
+                            }
+                        } else if (targetNetherWart) {
+                            if (nextState.getBlock() instanceof NetherWartBlock || isSoulSand(nextState)) {
+                                canTraverse = true;
+                            }
+                        } else {
+                            // Farmland crops: traverse connected Farmland or the SAME crop type!
+                            if (isFarmland(nextState)) {
+                                BlockState aboveFarmland = level.getBlockState(next.above());
+                                if (aboveFarmland.is(startState.getBlock()) || aboveFarmland.isAir()) {
+                                    canTraverse = true;
+                                }
+                            } else if (nextState.is(startState.getBlock())) {
+                                canTraverse = true;
+                            }
                         }
-                    } else if (targetBerry) {
-                        if (nextState.getBlock() instanceof SweetBerryBushBlock) {
-                            canTraverse = true;
-                        }
-                    } else if (targetVines) {
-                        if (nextState.getBlock() instanceof CaveVines || nextState.is(Blocks.CAVE_VINES) || nextState.is(Blocks.CAVE_VINES_PLANT)) {
-                            canTraverse = true;
-                        }
-                    } else if (targetCocoa) {
-                        if (nextState.getBlock() instanceof CocoaBlock) {
-                            canTraverse = true;
-                        }
-                    } else if (targetNetherWart) {
-                        if (nextState.getBlock() instanceof NetherWartBlock || isSoulSand(nextState)) {
-                            canTraverse = true;
-                        }
-                    } else {
-                        // Farmland crops: traverse connected Farmland or connected crops on farmland
-                        if (isFarmland(nextState) || (isCrop(nextState) && !isStem(nextState))) {
-                            canTraverse = true;
-                        }
-                    }
 
-                    if (canTraverse) {
-                        visited.add(next);
-                        queue.add(next);
+                        if (canTraverse) {
+                            visited.add(next);
+                            queue.add(next);
+                        }
                     }
                 }
             }
@@ -1286,6 +1296,9 @@ public class FarmingManager {
             return Collections.emptyList();
         }
 
+        // Determine target crop block for strict type matching
+        final net.minecraft.world.level.block.Block targetCropBlock = isBonemealCrop(startState) ? startState.getBlock() : null;
+
         queue.add(actualTargetPos);
         visited.add(actualTargetPos);
 
@@ -1300,7 +1313,8 @@ public class FarmingManager {
                 candidateState = level.getBlockState(candidateCrop);
             }
 
-            if (isBonemealCrop(candidateState) && candidateState.getBlock() instanceof BonemealableBlock bonemealable) {
+            boolean isSameCropType = targetCropBlock == null || candidateState.is(targetCropBlock);
+            if (isSameCropType && isBonemealCrop(candidateState) && candidateState.getBlock() instanceof BonemealableBlock bonemealable) {
                 if (bonemealable.isValidBonemealTarget(level, candidateCrop, candidateState)) {
                     if (!result.contains(candidateCrop)) {
                         result.add(candidateCrop);
@@ -1308,23 +1322,37 @@ public class FarmingManager {
                 }
             }
 
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    BlockPos next = current.relative(dir).above(dy);
-                    if (visited.contains(next)) continue;
-                    if (Math.abs(next.getX() - actualTargetPos.getX()) > radius
-                            || Math.abs(next.getZ() - actualTargetPos.getZ()) > radius
-                            || Math.abs(next.getY() - actualTargetPos.getY()) > 2) {
-                        continue;
-                    }
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos next = current.offset(dx, dy, dz);
+                        if (visited.contains(next)) continue;
+                        if (Math.abs(next.getX() - actualTargetPos.getX()) > radius
+                                || Math.abs(next.getZ() - actualTargetPos.getZ()) > radius
+                                || Math.abs(next.getY() - actualTargetPos.getY()) > 2) {
+                            continue;
+                        }
 
-                    BlockState nextState = level.getBlockState(next);
+                        BlockState nextState = level.getBlockState(next);
 
-                    // STRICTLY ONLY traverse connected farmland or crops!
-                    // NEVER traverse Grass Blocks, Dirt, or wild foliage!
-                    if (isFarmland(nextState) || isBonemealCrop(nextState)) {
-                        visited.add(next);
-                        queue.add(next);
+                        // STRICTLY ONLY traverse connected farmland or matching crops!
+                        // NEVER traverse Grass Blocks, Dirt, or wild foliage!
+                        boolean canTraverse = false;
+                        if (isFarmland(nextState)) {
+                            canTraverse = true;
+                        } else if (isBonemealCrop(nextState)) {
+                            if (targetCropBlock != null) {
+                                canTraverse = nextState.is(targetCropBlock);
+                            } else {
+                                canTraverse = true;
+                            }
+                        }
+
+                        if (canTraverse) {
+                            visited.add(next);
+                            queue.add(next);
+                        }
                     }
                 }
             }
@@ -1351,20 +1379,23 @@ public class FarmingManager {
             BlockPos current = queue.poll();
             result.add(current);
 
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    BlockPos next = current.relative(dir).above(dy);
-                    if (visited.contains(next)) continue;
-                    if (Math.abs(next.getX() - clickedPos.getX()) > radius
-                            || Math.abs(next.getZ() - clickedPos.getZ()) > radius
-                            || Math.abs(next.getY() - clickedPos.getY()) > 2) {
-                        continue;
-                    }
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos next = current.offset(dx, dy, dz);
+                        if (visited.contains(next)) continue;
+                        if (Math.abs(next.getX() - clickedPos.getX()) > radius
+                                || Math.abs(next.getZ() - clickedPos.getZ()) > radius
+                                || Math.abs(next.getY() - clickedPos.getY()) > 2) {
+                            continue;
+                        }
 
-                    // Must be contiguous tillable block! Stops at stone, water, wood, farmland, etc.
-                    if (isTillable(level, player, hand, next)) {
-                        visited.add(next);
-                        queue.add(next);
+                        // Must be contiguous tillable block! Stops at stone, water, wood, farmland, etc.
+                        if (isTillable(level, player, hand, next)) {
+                            visited.add(next);
+                            queue.add(next);
+                        }
                     }
                 }
             }
@@ -1406,27 +1437,30 @@ public class FarmingManager {
                 result.add(current);
             }
 
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    BlockPos next = current.relative(dir).above(dy);
-                    if (visited.contains(next)) continue;
-                    if (Math.abs(next.getX() - actualSoil.getX()) > radius
-                            || Math.abs(next.getZ() - actualSoil.getZ()) > radius
-                            || Math.abs(next.getY() - actualSoil.getY()) > 2) {
-                        continue;
-                    }
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos next = current.offset(dx, dy, dz);
+                        if (visited.contains(next)) continue;
+                        if (Math.abs(next.getX() - actualSoil.getX()) > radius
+                                || Math.abs(next.getZ() - actualSoil.getZ()) > radius
+                                || Math.abs(next.getY() - actualSoil.getY()) > 2) {
+                            continue;
+                        }
 
-                    BlockState nextState = level.getBlockState(next);
-                    boolean matches = false;
-                    if (isSoulSandTarget && isSoulSand(nextState)) {
-                        matches = true;
-                    } else if (isFarmlandTarget && isFarmland(nextState)) {
-                        matches = true;
-                    }
+                        BlockState nextState = level.getBlockState(next);
+                        boolean matches = false;
+                        if (isSoulSandTarget && isSoulSand(nextState)) {
+                            matches = true;
+                        } else if (isFarmlandTarget && isFarmland(nextState)) {
+                            matches = true;
+                        }
 
-                    if (matches) {
-                        visited.add(next);
-                        queue.add(next);
+                        if (matches) {
+                            visited.add(next);
+                            queue.add(next);
+                        }
                     }
                 }
             }
