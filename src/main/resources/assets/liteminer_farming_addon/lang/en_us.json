@@ -1,0 +1,14 @@
+{
+  "mod.liteminer_farming_addon.name": "LiteMiner Farming Addon",
+  "mod.liteminer_farming_addon.description": "An addon for LiteMiner on NeoForge providing Area Tilling (Hoe), Mass Planting (Seeds/Crops), and AOE Bone Meal fertilizing.",
+  "config.liteminer_farming_addon.general": "General Settings",
+  "config.liteminer_farming_addon.max_blocks": "Maximum Blocks Affected",
+  "config.liteminer_farming_addon.farming_radius": "Farming Radius",
+  "config.liteminer_farming_addon.prevent_tool_breaking": "Prevent Tool Breaking",
+  "config.liteminer_farming_addon.pull_from_inventory": "Pull Seeds & Bone Meal from Inventory",
+  "config.liteminer_farming_addon.clear_foliage": "Clear Replaceable Foliage when Hoeing",
+  "config.liteminer_farming_addon.exhaustion_per_block": "Exhaustion Per Block",
+  "config.liteminer_farming_addon.require_sneak_fallback": "Require Sneak Fallback",
+  "config.liteminer_farming_addon.use_liteminer_limit": "Use LiteMiner Limit"
+}
+
