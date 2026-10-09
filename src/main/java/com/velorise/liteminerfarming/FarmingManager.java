@@ -557,6 +557,12 @@ public class FarmingManager {
 
             if (replant) {
                 Item seedItem = cropBlock.asItem();
+                if (seedItem == Items.AIR) {
+                    ItemStack pickStack = cropBlock.getCloneItemStack(serverLevel, cropPos, cropState);
+                    if (!pickStack.isEmpty()) {
+                        seedItem = pickStack.getItem();
+                    }
+                }
                 boolean canReplant = player.isCreative();
 
                 if (!canReplant && seedItem != Items.AIR) {
@@ -626,7 +632,7 @@ public class FarmingManager {
         if (player.isCreative()) {
             return;
         }
-        if (damageHoe && !heldItem.isEmpty() && heldItem.canPerformAction(ItemAbilities.HOE_TILL)) {
+        if (damageHoe && !heldItem.isEmpty() && FarmingEventHandler.isHoe(heldItem)) {
             heldItem.hurtAndBreak(1, player, hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
         }
         if (exhaustion > 0) {

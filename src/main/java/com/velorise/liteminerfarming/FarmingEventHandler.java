@@ -10,6 +10,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.item.HoeItem;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.ItemAbilities;
@@ -80,7 +82,7 @@ public class FarmingEventHandler {
         }
 
         // 1. Hoe Interaction (Mass Tilling)
-        if (heldItem.canPerformAction(ItemAbilities.HOE_TILL)) {
+        if (isHoe(heldItem)) {
             boolean handled = FarmingManager.handleMassHoe(serverPlayer, hand, heldItem, clickedPos);
             if (handled) {
                 event.setCancellationResult(InteractionResult.SUCCESS);
@@ -122,5 +124,14 @@ public class FarmingEventHandler {
             }
             return;
         }
+    }
+
+    public static boolean isHoe(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+        return stack.canPerformAction(ItemAbilities.HOE_TILL)
+                || stack.getItem() instanceof HoeItem
+                || stack.is(ItemTags.HOES);
     }
 }
