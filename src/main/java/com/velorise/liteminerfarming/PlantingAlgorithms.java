@@ -122,7 +122,7 @@ public class PlantingAlgorithms {
      */
     public static List<BlockPos> filterSmartSaplingPositions(Level level, List<BlockPos> candidateSoilList,
                                                               ItemStack seedStack, BlockPos originSoilPos) {
-        if (!FarmingConfig.SMART_SAPLING_PLANTING.get() || !PlantClassifier.isSapling(seedStack) || candidateSoilList.isEmpty()) {
+        if (!FarmingConfig.isSmartSaplingEnabled() || !PlantClassifier.isSapling(seedStack) || candidateSoilList.isEmpty()) {
             return candidateSoilList;
         }
 
@@ -296,7 +296,7 @@ public class PlantingAlgorithms {
         if (candidateSoils == null || candidateSoils.isEmpty()) {
             return Collections.emptyList();
         }
-        if (!FarmingConfig.SMART_FLOWER_PLANTING.get()) {
+        if (!FarmingConfig.isSmartFlowerEnabled()) {
             return candidateSoils;
         }
 
@@ -381,33 +381,47 @@ public class PlantingAlgorithms {
                 }
             }
 
+            int sparsity = FarmingConfig.FLOWER_SPARSITY.get();
+            if (sparsity <= 0) {
+                result.add(soil);
+                chosenPlants.add(plantPos);
+                continue;
+            }
+
             // Coherent multi-scale organic meadow noise
             float cNoise = floraSmoothNoise(soil.getX(), soil.getZ(), 6.5f, seed);
             float dNoise = hash2DFloat(soil.getX(), soil.getZ(), seed + 1013L);
 
             boolean accept = false;
 
-            if (cNoise >= 0.55f) {
+            // Higher sparsity = smaller clusters and wider spacing (Default 3 is noticeably more sparse)
+            float coreThreshold = 0.50f + (sparsity * 0.04f); // sparsity 3: 0.62f
+            float meadowThreshold = 0.25f + (sparsity * 0.02f); // sparsity 3: 0.31f
+
+            float clusterProb = Math.max(0.10f, 0.65f - (sparsity * 0.08f)); // sparsity 3: 0.41f
+            float sparseProb = Math.max(0.04f, 0.32f - (sparsity * 0.05f));  // sparsity 3: 0.17f
+            float gladeProb = Math.max(0.01f, 0.08f - (sparsity * 0.02f));   // sparsity 3: 0.02f
+
+            int maxClusterNeighbors = (sparsity >= 3) ? 1 : 2;
+
+            if (cNoise >= coreThreshold) {
                 // Zone A: Cluster Core ("crowd a bit")
-                // Small natural clumps of 2-3 flowers, but max 1 orthogonal neighbor and max 2 total neighbors
-                if (totalAdjacent <= 1 && (totalAdjacent + diagonalAdjacent) <= 2) {
-                    if (dNoise < 0.48f) {
+                if (totalAdjacent <= 1 && (totalAdjacent + diagonalAdjacent) <= maxClusterNeighbors) {
+                    if (dNoise < clusterProb) {
                         accept = true;
                     }
                 }
-            } else if (cNoise >= 0.28f) {
+            } else if (cNoise >= meadowThreshold) {
                 // Zone B: Sparse Meadow ("sparse away")
-                // Dispersed blooms: cannot touch another plant orthogonally (distance >= 2)
                 if (totalAdjacent == 0) {
-                    if (dNoise < 0.22f) {
+                    if (dNoise < sparseProb) {
                         accept = true;
                     }
                 }
             } else {
                 // Zone C: Open Glade ("dont have a fixed shape")
-                // Breathing room clearings: strictly isolated (distance >= 2 and no diagonals)
                 if (totalAdjacent == 0 && diagonalAdjacent == 0) {
-                    if (dNoise < 0.05f) {
+                    if (dNoise < gladeProb) {
                         accept = true;
                     }
                 }

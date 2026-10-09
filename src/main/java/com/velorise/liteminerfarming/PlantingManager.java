@@ -90,12 +90,12 @@ public class PlantingManager {
                 if (sorted == null || sorted.isEmpty()) {
                     return false;
                 }
-            } else if (PlantClassifier.isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
+            } else if (PlantClassifier.isSapling(seedStack) && FarmingConfig.isSmartSaplingEnabled()) {
                 sorted = PlantingAlgorithms.filterSmartSaplingPositions(level, sorted, seedStack, originSoilPos);
                 if (sorted == null || sorted.isEmpty()) {
                     return false;
                 }
-            } else if ((PlantClassifier.isFlower(seedStack) || PlantClassifier.isMushroom(seedStack) || PlantClassifier.isChorusFlower(seedStack)) && FarmingConfig.SMART_FLOWER_PLANTING.get()) {
+            } else if ((PlantClassifier.isFlower(seedStack) || PlantClassifier.isMushroom(seedStack) || PlantClassifier.isChorusFlower(seedStack)) && FarmingConfig.isSmartFlowerEnabled()) {
                 sorted = PlantingAlgorithms.filterAntiOvercrowdedFloraPositions(level, sorted, originSoilPos, seedStack);
                 if (sorted == null || sorted.isEmpty()) {
                     return false;
@@ -473,9 +473,9 @@ public class PlantingManager {
                 result = PlantingAlgorithms.filterOptimalCactusPositions(level, result, actualSoil);
             } else if (PlantClassifier.isFruitSeed(seedStack) && FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.get()) {
                 result = PlantingAlgorithms.filterOptimalFruitStemPositions(level, result, actualSoil);
-            } else if (PlantClassifier.isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
+            } else if (PlantClassifier.isSapling(seedStack) && FarmingConfig.isSmartSaplingEnabled()) {
                 result = PlantingAlgorithms.filterSmartSaplingPositions(level, result, seedStack, actualSoil);
-            } else if ((PlantClassifier.isFlower(seedStack) || PlantClassifier.isMushroom(seedStack) || PlantClassifier.isChorusFlower(seedStack)) && FarmingConfig.SMART_FLOWER_PLANTING.get()) {
+            } else if ((PlantClassifier.isFlower(seedStack) || PlantClassifier.isMushroom(seedStack) || PlantClassifier.isChorusFlower(seedStack)) && FarmingConfig.isSmartFlowerEnabled()) {
                 result = PlantingAlgorithms.filterAntiOvercrowdedFloraPositions(level, result, actualSoil, seedStack);
             }
         }

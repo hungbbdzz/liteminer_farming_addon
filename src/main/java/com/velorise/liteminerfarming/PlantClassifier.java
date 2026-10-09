@@ -141,8 +141,23 @@ public class PlantClassifier {
         if (stack.is(ItemTags.FLOWERS)) {
             return true;
         }
+        if (stack.is(Items.FERN) || stack.is(Items.LARGE_FERN)
+                || stack.is(Items.DEAD_BUSH) || stack.is(Items.SHORT_GRASS)
+                || stack.is(Items.TALL_GRASS)) {
+            return true;
+        }
         if (stack.getItem() instanceof BlockItem bi) {
-            return bi.getBlock().defaultBlockState().is(BlockTags.FLOWERS);
+            Block b = bi.getBlock();
+            BlockState state = b.defaultBlockState();
+            if (state.is(BlockTags.FLOWERS) || b instanceof FlowerBlock) {
+                return true;
+            }
+            if (b == Blocks.FERN || b == Blocks.LARGE_FERN || b == Blocks.DEAD_BUSH
+                    || b == Blocks.SHORT_GRASS || b == Blocks.TALL_GRASS) {
+                return true;
+            }
+            String id = b.getDescriptionId().toLowerCase(Locale.ROOT);
+            return id.contains("flower") || id.contains("fern") || id.contains("dead_bush") || id.contains("deadbush") || id.contains("shrub");
         }
         return false;
     }
@@ -151,7 +166,16 @@ public class PlantClassifier {
         if (state == null || state.isAir()) {
             return false;
         }
-        return state.is(BlockTags.FLOWERS) || state.getBlock() instanceof FlowerBlock;
+        if (state.is(BlockTags.FLOWERS) || state.getBlock() instanceof FlowerBlock) {
+            return true;
+        }
+        Block b = state.getBlock();
+        if (b == Blocks.FERN || b == Blocks.LARGE_FERN || b == Blocks.DEAD_BUSH
+                || b == Blocks.SHORT_GRASS || b == Blocks.TALL_GRASS) {
+            return true;
+        }
+        String id = b.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("flower") || id.contains("fern") || id.contains("dead_bush") || id.contains("deadbush") || id.contains("shrub");
     }
 
     /**

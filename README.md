@@ -136,62 +136,55 @@ The codebase has been refactored from a monolithic class into a decoupled, high-
 
 ## ⚙️ Configuration
 
-The configuration file is generated automatically at `.minecraft/config/liteminer_farming_addon-common.toml`:
+### 🖥️ Native In-Game Configuration GUI
+No third-party configuration mods (like *Configured* or *Cloth Config*) required!
+* Go to Minecraft's **Mods** menu (`Esc` -> `Mods`).
+* Select **Vein Farming: Universal Crop Harvester**.
+* Click the **Config** button.
+* An authentic, clean vanilla Minecraft style menu opens with interactive sliders and toggle switches. Frequently modified gameplay settings (Sapling Spacing, Flower Sparsity, Max Blocks, Farming Radius, In-World Preview) appear prominently at the top.
+* Features **Reset Defaults**, **Cancel**, and **Done** buttons with instant persistence.
+
+### 📄 Configuration File
+The configuration is saved automatically at `.minecraft/config/liteminer_farming_addon-common.toml`:
 
 ```toml
 [general]
+  # Minimum spacing between planted saplings (0 = OFF / Carpet mode, 1-8 blocks, default: 4)
+  sapling_min_spacing = 4
+  # Flora & Flower sparsity level (0 = OFF / Dense carpet, 1-5 = Organic meadow noise, default: 3)
+  flower_sparsity = 3
   # Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action
   max_blocks = 64
-  # Inherit block limit from LiteMiner's config
-  use_liteminer_limit = true
   # Maximum horizontal radius from the clicked block
   farming_radius = 8
-  # Prevent tools from breaking
-  prevent_tool_breaking = true
-  # Automatically pull seeds & bone meal from inventory when hand runs out
-  pull_from_inventory = true
-  # Clear wild grass/flowers above dirt when tilling
-  clear_foliage = true
-  # Food exhaustion per block
-  exhaustion_per_block = 0.02
-  # Require Shift/Sneak if LiteMiner is not installed
-  require_sneak_fallback = true
-  # Enable AOE mass harvesting of mature crops
-  enable_mass_harvest = true
+  # Render real-time in-world preview highlight when mass farming key is held
+  standalone_preview = true
+  # 40/40 Inverted Checkerboard fruit stem planting (Melon & Pumpkin)
+  smart_melon_pumpkin_planting = true
+  # Allow bone meal on small flowers (Poppy, Dandelion, etc.) to propagate nearby clones (Bedrock Edition feature)
+  bedrock_flower_bonemeal = true
+  # Alternating row intercropping when holding different seeds in both hands
+  smart_intercropping = true
   # Automatically replant harvested crops at age 0 using dropped or inventory seeds
   replant_crops = true
-  # If holding a hoe when mass harvesting, consume durability per crop
-  damage_hoe_on_harvest = true
+  # Prevent tools from breaking
+  prevent_tool_breaking = true
+  # Clear wild grass/flowers above dirt when tilling
+  clear_foliage = true
+  # Batch composter processing up to 128 items in one click
+  batch_composter = true
   # Continue fertilizing growing crops in the selected area until they reach maturity
   smart_bonemeal = true
   # Prevent farmland from being trampled into dirt when players or mobs jump or land on it
   prevent_farmland_trample = true
-  # Gather all harvested item drops at the targeted block position
-  collect_drops_at_target = true
-  # Deposit harvested drops directly into the player's inventory
-  harvest_to_inventory = false
-  # Enable mass harvesting of column crops (Sugar Cane, Bamboo, Cactus, Kelp) preserving bottom root
-  harvest_sugar_cane = true
-  # Smart Sapling Planting with 2x2 mega pairing and anti-overcrowding spacing
-  smart_sapling_planting = true
-  # Minimum spacing between planted saplings
-  sapling_min_spacing = 2
-  # Auto-pair 2x2 saplings (Dark Oak, Spruce, Jungle)
-  smart_sapling_2x2 = true
-  # Bipartite Maximum Independent Set Cactus planting
-  smart_cactus_planting = true
-  # 40/40 Inverted Checkerboard fruit stem planting (Melon & Pumpkin)
-  smart_melon_pumpkin_planting = true
-  # Alternating row intercropping when holding different seeds in both hands
-  smart_intercropping = true
-  # Organic meadow distribution for flowers, mushrooms, and chorus flowers
-  smart_flower_planting = true
-  # Batch composter processing up to 128 items in one click
-  batch_composter = true
-  # Farmer's Delight knife straw compatibility
-  farmers_delight_knife_compat = true
-  # Satisfying rising pitch audio cascade
-  satisfying_audio_cascade = true
+  # If holding a hoe when mass harvesting, consume durability per crop
+  damage_hoe_on_harvest = true
+  # Food exhaustion per block
+  exhaustion_per_block = 0.02
+  # Require Shift/Sneak if LiteMiner is not installed
+  require_sneak_fallback = true
+  # Inherit block limit from LiteMiner's config
+  use_liteminer_limit = true
 ```
 
 ---

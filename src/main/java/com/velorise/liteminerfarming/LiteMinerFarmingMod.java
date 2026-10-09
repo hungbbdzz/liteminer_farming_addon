@@ -29,6 +29,10 @@ public class LiteMinerFarmingMod {
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             NeoForge.EVENT_BUS.register(new StandaloneHighlightRenderer());
+            modContainer.registerExtensionPoint(
+                    net.neoforged.neoforge.client.gui.IConfigScreenFactory.class,
+                    (container, screen) -> new com.velorise.liteminerfarming.client.FarmingConfigScreen(screen)
+            );
         }
 
         LOGGER.info("Vein Farming: Universal Crop Harvester initialized successfully!");

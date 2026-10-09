@@ -183,7 +183,7 @@ public class FarmingEventHandler {
             if (handled) {
                 event.setCancellationResult(InteractionResult.SUCCESS);
                 event.setCanceled(true);
-            } else if (FarmingManager.isSapling(heldItem) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
+            } else if (FarmingManager.isSapling(heldItem) && FarmingConfig.isSmartSaplingEnabled()) {
                 // If smart sapling planting could not find enough space to plant a group/grove,
                 // cancel the event so vanilla does NOT sneak-place a single lonely sapling!
                 event.setCancellationResult(InteractionResult.FAIL);
