@@ -7,82 +7,116 @@
 The ultimate universal AOE farming mod for **NeoForge 1.21.1**.  
 Built as a seamless companion for **[LiteMiner](https://modrinth.com/mod/liteminer)** and **[FTB Ultimine](https://modrinth.com/mod/ftb-ultimine)**, with full **Standalone Mode** support featuring its own client-side highlight outline preview!
 
-Brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, **Smart AOE Bone Meal**, **Root-Preserving Column Crop Harvesting**, and **Stem-Protected Fruit Harvesting with Auto-Replant** to Minecraft!
+Brings **Area Tilling**, **Smart Mass Planting with Advanced Spatial Algorithms**, **AOE Bone Meal**, **Root-Preserving Column Crop Harvesting**, **Stem-Protected Fruit Harvesting**, **Mass Destruction Mode**, **Batch Composting**, and **Auto-Replanting** to Minecraft!
 
 ---
 
-## ✨ Universal Features
+## ✨ Features & Mechanics
 
 ### 🚜 1. Mass Tilling (Area Hoe)
-* Hold any **Hoe** and press your **LiteMiner / FTB Ultimine activation key** (or hold `Shift/Sneak`).
+* Hold any **Hoe** and press your **LiteMiner / FTB Ultimine activation key** (or hold `Sneak/Shift`).
 * **Right-click** on any tillable soil (`Grass Block`, `Dirt`, `Coarse Dirt`, `Rooted Dirt`, etc.).
 * All blocks in your active shape (`3x3`, `Shapeless`, `Tunnel`...) are converted into **Farmland**!
 * **Safe Foliage Clearing:** Automatically clears wild grass, ferns, and flowers above the soil without ever harming pre-existing crops.
-* **Tool Protection:** Respects tool durability and stops before your tool breaks (`prevent_tool_breaking`).
-
-### 🌱 2. Mass Planting (Seeds & Crops)
-* Hold any **Seeds or Crops** (`Wheat`, `Carrot`, `Potato`, `Beetroot`, `Melon`, `Pumpkin`, `Torchflower`, `Pitcher Pod`...).
-* Fully compatible with modded crops like **Farmer's Delight** (Tomato, Cabbage, Onion, Rice...).
-* Fully compatible with modded farmland like **Rich Soil Farmland**.
-* **Right-click** on Farmland to carpet-plant all empty Farmland blocks in the selected shape!
-* **Smart Inventory Replenishment:** If the stack in your hand runs out, the mod automatically consumes matching seeds from your inventory.
-
-### 🦴 3. AOE Bone Meal (Smart Fertilizing)
-* Hold **Bone Meal** and **Right-click** on crops.
-* **Smart Area Growth:** Even if the block you are looking at is already fully mature, Bone Meal will automatically bypass it and continue fertilizing all other growing crops in the selected area until they reach 100% maturity!
-* In **Creative Mode**, bone meal is never consumed. In Survival, it safely draws from your hand and inventory as needed.
-
-### 🌾 4. Universal Mass Harvesting
-* **Right-click** on any crop or farmland to trigger harvest.
-* Works with an **empty hand**, holding a **Hoe**, or any tool.
-* **Auto-Replant:** Automatically harvests all mature crops and **replants** them at age 0 using dropped or inventory seeds!
-* **Immature Crop Safety:** Immature crops in the selected area are safely preserved while harvesting all mature ones!
-* **Vertical Column Crops (Sugar Cane, Cactus, Bamboo, Kelp):** Automatically identifies the bottom root/anchor block and **strictly preserves the root**, only harvesting the stalks above it!
-* **Fruit & Stem Protection (Melon, Pumpkin):** Harvests ripe melons and pumpkins while **strictly protecting and preserving stems (`StemBlock`)**!
-* **Berry Picking:** Gathers **Sweet Berries** and **Cave Vines (Glow Berries)** and resets their age without breaking the vine/bush.
-* **Item Drop Aggregation:** All harvested drops are automatically merged into compact stacks and spawned right at the targeted block location, identical to LiteMiner!
-* Supports **Fortune** enchantments if holding an enchanted tool.
-
-### 🛡️ 5. Farmland Trample Prevention
-* Built-in protection preventing Farmland (`#farmland`) from turning back to dirt when players or mobs jump or land on it! Configurable via `prevent_farmland_trample`.
-
-### 👁️ 6. Standalone Client Highlight Preview
-* When LiteMiner is not installed, the mod renders its own real-time **wireframe bounding box highlight** on target blocks when holding Sneak!
-* Color-coded preview:
-  - 🌾 **Golden Amber:** Harvesting
-  - 🌿 **Sprout Green:** Planting
-  - 💎 **Emerald Jade:** Bone Meal fertilizing
-  - 🟫 **Earth Brown:** Tilling (Hoe)
+* **Tool Breaking Protection:** Stops before your tool breaks when `prevent_tool_breaking` is enabled.
 
 ---
 
-## 🎮 How It Works
+### 🌱 2. Smart Mass Planting (Seeds & Crops)
+Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-plant seeds and crops!
 
-### With LiteMiner or FTB Ultimine
-1. Select your desired shape (e.g. `3x3`, `Shapeless`, etc.).
-2. Hold your veinmine key (`~` by default). The highlight shows the exact target blocks!
-3. **Right-click** with a Hoe, Seeds, Bone Meal, or empty hand on crops!
+* **Universal Crop Support:** Wheat, Carrot, Potato, Beetroot, Torchflower, Pitcher Pod, Nether Wart, Bamboo, Sugar Cane, Cactus, Kelp, Chorus Flower, Cocoa Beans, etc.
+* **Modded Crop & Farmland Support:** Farmer's Delight (Tomato, Cabbage, Onion, Rice), Rich Soil Farmland, etc.
+* **Smart Inventory Replenishment:** When your hand stack empties, seeds are automatically drawn from your inventory.
 
-### Standalone Mode (No Miner Mod Required)
-LiteMiner and FTB Ultimine are **completely optional**:
-* Simply hold **Sneak (`Shift`)** while right-clicking!
-* Real-time client wireframe outline shows you exactly which blocks will be affected.
+#### 📐 Advanced Spatial Planting Algorithms:
+1. **🌳 Smart Sapling Groves (`smart_sapling_planting`):**
+   * **2x2 Mega Tree Auto-Pairing:** Automatically identifies 2x2 clusters for **Dark Oak**, **Spruce**, and **Jungle** saplings, spacing clusters $\ge 2$ blocks apart.
+   * **Strict 2x2 Enforcement:** Dark Oak saplings (which cannot grow as 1x1) will *never* be planted as isolated single saplings.
+   * **Canopy & Overcrowding Detection:** Scans existing trees, logs, and leaves in the world to prevent planting under thick canopies or too close to grown trees.
+2. **🍉 Optimal Fruit Stem Layout (`smart_melon_pumpkin_planting`):**
+   * Uses an **Inverted Checkerboard 40/40 Layout** for Melon and Pumpkin seeds.
+   * Automatically leaves empty adjacent dirt/farmland spots for fruit to spawn, guaranteeing **0% growth penalty** and maximum fruit spawn rates.
+3. **🌵 Maximum Independent Set (MIS) Cactus Planting (`smart_cactus_planting`):**
+   * Solves a bipartite maximum independent set grid graph in real time to ensure no two planted cacti are orthogonally adjacent (which would cause them to break and pop off).
+4. **🌸 Anti-Overcrowding Flora Layout (`smart_flower_planting`):**
+   * Automatically spaces Flowers (`#minecraft:flowers`), Mushrooms (`#c:mushrooms`, Red/Brown Mushroom, Nether Fungi), and Chorus Flowers in a checkerboard pattern ($\ge 2$ Manhattan distance), avoiding clumping.
+5. **🍫 Cocoa Bean Trunk Planting:**
+   * Right-click on Jungle Logs with Cocoa Beans to plant them on all available horizontal bark faces!
+6. **🔄 Context-Aware Intercropping (Xen Canh) (`smart_intercropping`):**
+   * Hold one crop in your **Main Hand** (e.g., Carrot) and another in your **Off Hand** (e.g., Potato).
+   * Plants strictly **alternating rows** (Carrot row, Potato row, Carrot row...) to grant the vanilla crop growth speed bonus!
+   * Automatically synchronizes row parity with existing planted crops in the farm.
+   * Fruit seeds (Melon/Pumpkin) are strictly excluded from being forced into intercropping.
 
-## ⚖️ LiteMiner Addon vs. Standalone Mode
+---
 
-| Feature / Aspect | With LiteMiner (Addon Mode) | Without LiteMiner (Standalone Mode) |
-| :--- | :--- | :--- |
-| **Activation Key** | LiteMiner keybind (`~` by default) | Hold **Sneak (`Shift`)** *(configurable)* |
-| **Area Shapes** | Switchable shapes (`3x3`, `Tunnel`, `Staircase`, `Shapeless`...) | Natural clustered radius search (`farming_radius` & `max_blocks`) |
-| **Target Highlight Preview** | Real-time client outline preview | None (actions execute directly upon click) |
-| **Block Limits** | Inherited from LiteMiner config | Configured via `farming_radius` & `max_blocks` |
-| **Core Mechanics** | Full (Till, Plant, Fertilize, Harvest & Replant) | Full (Till, Plant, Fertilize, Harvest & Replant) |
+### 🦴 3. AOE Bone Meal (Smart Fertilizing)
+* Hold **Bone Meal** and **Right-click** on crops.
+* **Smart Area Growth:** Even if the clicked crop is already mature, Bone Meal will automatically bypass it and continue fertilizing all other growing crops in the area until they reach 100% maturity!
+* In **Creative Mode**, bone meal is never consumed. In Survival, it draws safely from your hand and inventory.
+
+---
+
+### 🌾 4. Universal Mass Harvesting & Auto-Replanting
+* **Right-click** on crops or farmland with an empty hand or tool.
+* **Auto-Replant:** Automatically harvests mature crops and replants them at age 0 using dropped or inventory seeds!
+* **Immature Crop Safety:** Immature crops are strictly preserved.
+* **Root-Preserving Column Crops (Sugar Cane, Bamboo, Cactus, Kelp):** Automatically identifies the bottom root/anchor block and **strictly preserves the root**, only harvesting the stalks above it!
+* **Fruit & Stem Protection (Melon, Pumpkin):** Harvests ripe melons and pumpkins while **strictly protecting and preserving stems (`StemBlock`)**!
+* **Berry Picking:** Gathers **Sweet Berries** and **Cave Vines (Glow Berries)** and resets their age without breaking the vine/bush.
+* **Chorus Tree Traversal:** Gathers Chorus Fruit and Flowers across 3D branches while replanting a Chorus Flower on the End Stone base.
+* **🔪 Farmer's Delight Knife Compatibility:** Harvesting crops with a knife drops Straw with Fortune scaling!
+* **Direct-to-Inventory & Drop Aggregation:** Harvested items can be placed directly into your inventory or neatly merged into compact stacks right at your feet.
+
+---
+
+### 🪓 5. Mass Destruction Mode (Farm Plot Clearing)
+* Hold **Sneak (`Shift`)** (or your miner mod key) and **Left-click (Mine)** a crop while holding any tool (**Axe, Pickaxe, Shovel, Hoe, Knife, Shears**).
+* Completely clears all connected agricultural crops, stems, and column roots **without replanting**, allowing you to completely redesign or wipe farm plots in seconds!
+* Strictly restricted to agricultural plants—will never accidentally break stone, dirt, or ores.
+
+---
+
+### 🍂 6. Batch Composting
+* Right-click a **Composter** while holding compostable items.
+* Instantly processes up to **128 items** from your hand and inventory in a single click, popping Bone Meal directly into your inventory or above the composter!
+
+---
+
+### 🛡️ 7. Farmland Trample Prevention
+* Built-in protection preventing Farmland (`#farmland`) from turning back to dirt when players or mobs jump or land on it! Configurable via `prevent_farmland_trample`.
+
+---
+
+### 👁️ 8. Standalone Real-Time 3D Wireframe Preview
+When LiteMiner is not installed, the mod renders its own client-side **wireframe bounding box highlight** on target blocks when holding Sneak:
+* 🌾 **Golden Amber:** Mass Harvesting
+* 🌿 **Sprout Green:** Mass Planting
+* 🛑 **Crimson Red:** Mass Destruction
+* 💎 **Emerald Jade:** Bone Meal Fertilizing
+* 🟫 **Earth Brown:** Area Tilling (Hoe)
+
+---
+
+## 🏛️ Modular Code Architecture
+
+The codebase has been refactored from a monolithic class into a decoupled, high-performance modular architecture:
+
+| Class | Responsibility |
+| :--- | :--- |
+| **`PlantClassifier.java`** | Universal tags, block & item categorization, soil validation, and crop maturity logic. |
+| **`PlantingAlgorithms.java`** | Spatial layout algorithms: 2x2 sapling groves, cactus bipartite MIS, fruit stem 40/40 layouts, and intercropping row parity. |
+| **`PlantingManager.java`** | Mass planting execution, Cocoa Bean log wrapping, and BFS candidate search. |
+| **`HarvestManager.java`** | Mass harvesting, auto-replanting, left-click destruction, and harvest BFS search. |
+| **`TillingAndFertilizingManager.java`** | Mass hoe tilling, AOE bone meal fertilizing, and batch composting. |
+| **`FarmingManager.java`** | High-level facade delegating to the domain managers while preserving 100% backward compatibility for external callers. |
 
 ---
 
 ## ⚙️ Configuration
 
-The config file is generated automatically at `.minecraft/config/liteminer_farming_addon-common.toml`:
+The configuration file is generated automatically at `.minecraft/config/liteminer_farming_addon-common.toml`:
 
 ```toml
 [general]
@@ -114,8 +148,30 @@ The config file is generated automatically at `.minecraft/config/liteminer_farmi
   prevent_farmland_trample = true
   # Gather all harvested item drops at the targeted block position
   collect_drops_at_target = true
-  # Enable mass harvesting of sugar cane, preserving the bottom root block
+  # Deposit harvested drops directly into the player's inventory
+  harvest_to_inventory = false
+  # Enable mass harvesting of column crops (Sugar Cane, Bamboo, Cactus, Kelp) preserving bottom root
   harvest_sugar_cane = true
+  # Smart Sapling Planting with 2x2 mega pairing and anti-overcrowding spacing
+  smart_sapling_planting = true
+  # Minimum spacing between planted saplings
+  sapling_min_spacing = 2
+  # Auto-pair 2x2 saplings (Dark Oak, Spruce, Jungle)
+  smart_sapling_2x2 = true
+  # Bipartite Maximum Independent Set Cactus planting
+  smart_cactus_planting = true
+  # 40/40 Inverted Checkerboard fruit stem planting (Melon & Pumpkin)
+  smart_melon_pumpkin_planting = true
+  # Alternating row intercropping when holding different seeds in both hands
+  smart_intercropping = true
+  # Anti-overcrowding checkerboard spacing for flowers, mushrooms, and chorus flowers
+  smart_flower_planting = true
+  # Batch composter processing up to 128 items in one click
+  batch_composter = true
+  # Farmer's Delight knife straw compatibility
+  farmers_delight_knife_compat = true
+  # Satisfying rising pitch audio cascade
+  satisfying_audio_cascade = true
 ```
 
 ---
@@ -127,17 +183,10 @@ Clone the repository and build using Gradle:
 ```bash
 git clone https://github.com/hungbbdzz/vein-farming.git
 cd vein-farming
-./gradlew build
+./gradlew build --no-daemon
 ```
 
 The compiled mod JAR will be located in `build/libs/`.
-
----
-
-## 🤝 Credits & Disclaimer
-
-* This is an **unofficial** companion addon for [LiteMiner](https://modrinth.com/mod/liteminer) created by **iamkaf** (MIT License).
-* Logo is a derivative work of LiteMiner's original icon.
 
 ---
 
