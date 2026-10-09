@@ -53,7 +53,7 @@ public class LiteMinerCompat {
     }
 
     public static int getEffectiveBlockLimit() {
-        if (FarmingConfig.USE_LITEMINER_LIMIT.get() && isLiteMinerLoaded()) {
+        if (isLiteMinerLoaded()) {
             try {
                 return com.iamkaf.liteminer.Liteminer.CONFIG.blockBreakLimit.get();
             } catch (Throwable ignored) {

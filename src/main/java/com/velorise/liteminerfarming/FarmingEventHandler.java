@@ -315,11 +315,7 @@ public class FarmingEventHandler {
             if (ACTIVE_KEYS.getOrDefault(player.getUUID(), false)) {
                 return true;
             }
-            if (FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-                return player.isShiftKeyDown();
-            } else {
-                return true;
-            }
+            return player.isShiftKeyDown();
         }
         return false;
     }

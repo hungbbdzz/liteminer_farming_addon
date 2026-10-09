@@ -12,8 +12,8 @@
   "config.liteminer_farming_addon.prevent_tool_breaking": "Prevent Tool Breaking",
   "config.liteminer_farming_addon.pull_from_inventory": "Pull Seeds & Bone Meal from Inventory",
   "config.liteminer_farming_addon.clear_foliage": "Clear Replaceable Foliage when Hoeing",
-  "config.liteminer_farming_addon.exhaustion_per_block": "Exhaustion Per Block",
-  "config.liteminer_farming_addon.require_sneak_fallback": "Require Sneak Fallback",
-  "config.liteminer_farming_addon.use_liteminer_limit": "Use LiteMiner Limit",
+  "config.liteminer_farming_addon.harvest_to_inventory": "Harvest Direct to Inventory",
+  "config.liteminer_farming_addon.sapling_min_spacing": "Sapling Minimum Spacing",
+  "config.liteminer_farming_addon.flower_sparsity": "Flower & Flora Sparsity",
   "config.liteminer_farming_addon.bedrock_flower_bonemeal": "Bedrock-style Flower Bone Meal Propagation"
 }

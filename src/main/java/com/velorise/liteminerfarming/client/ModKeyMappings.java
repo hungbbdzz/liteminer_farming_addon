@@ -37,16 +37,7 @@ public final class ModKeyMappings {
         if (mc.player == null) {
             return false;
         }
-        if (KEY_ACTIVATE.isDown()) {
-            return true;
-        }
-        if (mc.options.keyShift.isDown()) {
-            return true;
-        }
-        if (!FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-            return true;
-        }
-        return false;
+        return KEY_ACTIVATE.isDown() || mc.options.keyShift.isDown();
     }
 
     private ModKeyMappings() {

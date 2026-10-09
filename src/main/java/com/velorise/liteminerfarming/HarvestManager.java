@@ -336,7 +336,7 @@ public class HarvestManager {
             List<ItemStack> drops = new ArrayList<>(Block.getDrops(cropState, serverLevel, cropPos, null, player, heldItem));
 
             // Farmer's Delight Knife Compatibility: Straw drops
-            if (FarmingConfig.FARMERS_DELIGHT_KNIFE_COMPAT.get() && PlantClassifier.isKnife(heldItem)) {
+            if (PlantClassifier.isKnife(heldItem)) {
                 Item strawItem = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("farmersdelight", "straw"));
                 if (strawItem != null && strawItem != Items.AIR) {
                     boolean alreadyHasStraw = drops.stream().anyMatch(s -> s.is(strawItem));
@@ -467,7 +467,7 @@ public class HarvestManager {
         if (player.isCreative()) {
             return;
         }
-        boolean isFarmingTool = FarmingEventHandler.isHoe(heldItem) || (FarmingConfig.FARMERS_DELIGHT_KNIFE_COMPAT.get() && PlantClassifier.isKnife(heldItem));
+        boolean isFarmingTool = FarmingEventHandler.isHoe(heldItem) || PlantClassifier.isKnife(heldItem);
         if (damageHoe && !heldItem.isEmpty() && isFarmingTool) {
             heldItem.hurtAndBreak(1, player, hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
         }

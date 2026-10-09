@@ -10,12 +10,12 @@ public class FarmingConfig {
     public static final ModConfigSpec.IntValue FLOWER_SPARSITY;
     public static final ModConfigSpec.IntValue MAX_BLOCKS;
     public static final ModConfigSpec.IntValue FARMING_RADIUS;
+    public static final ModConfigSpec.BooleanValue HARVEST_TO_INVENTORY;
     public static final ModConfigSpec.BooleanValue STANDALONE_PREVIEW;
     public static final ModConfigSpec.BooleanValue SMART_MELON_PUMPKIN_PLANTING;
     public static final ModConfigSpec.BooleanValue BEDROCK_FLOWER_BONEMEAL;
     public static final ModConfigSpec.BooleanValue SMART_INTERCROPPING;
     public static final ModConfigSpec.BooleanValue REPLANT_CROPS;
-    public static final ModConfigSpec.BooleanValue HARVEST_TO_INVENTORY;
     public static final ModConfigSpec.BooleanValue PREVENT_TOOL_BREAKING;
     public static final ModConfigSpec.BooleanValue CLEAR_FOLIAGE;
     public static final ModConfigSpec.BooleanValue BATCH_COMPOSTER;
@@ -29,10 +29,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue SMART_IRRIGATION_PREVIEW;
     public static final ModConfigSpec.BooleanValue GROWTH_PENALTY_WARNING;
     public static final ModConfigSpec.BooleanValue SATISFYING_AUDIO_CASCADE;
-    public static final ModConfigSpec.BooleanValue FARMERS_DELIGHT_KNIFE_COMPAT;
     public static final ModConfigSpec.DoubleValue EXHAUSTION_PER_BLOCK;
-    public static final ModConfigSpec.BooleanValue REQUIRE_SNEAK_FALLBACK;
-    public static final ModConfigSpec.BooleanValue USE_LITEMINER_LIMIT;
     public static final ModConfigSpec.BooleanValue COLLECT_DROPS_AT_TARGET;
     public static final ModConfigSpec.BooleanValue HARVEST_SUGAR_CANE;
     public static final ModConfigSpec.BooleanValue ENABLE_MASS_HARVEST;
@@ -73,6 +70,10 @@ public class FarmingConfig {
                 .comment("Maximum horizontal radius from the clicked block.")
                 .defineInRange("farming_radius", 8, 1, 32);
 
+        HARVEST_TO_INVENTORY = builder
+                .comment("Send harvested items directly into the player's inventory instead of dropping them on the ground (overflow drops on ground).")
+                .define("harvest_to_inventory", false);
+
         STANDALONE_PREVIEW = builder
                 .comment("Enable client-side highlight wireframe preview when LiteMiner is not installed.")
                 .define("standalone_preview", true);
@@ -92,10 +93,6 @@ public class FarmingConfig {
         REPLANT_CROPS = builder
                 .comment("Automatically replant harvested crops at age 0 using dropped or inventory seeds.")
                 .define("replant_crops", true);
-
-        HARVEST_TO_INVENTORY = builder
-                .comment("Send harvested items directly into the player's inventory instead of dropping them on the ground (overflow drops on ground).")
-                .define("harvest_to_inventory", false);
 
         PREVENT_TOOL_BREAKING = builder
                 .comment("Prevent tools from breaking during mass farming actions.")
@@ -142,21 +139,9 @@ public class FarmingConfig {
                 .comment("Play a musical ascending audio pitch cascade and sparkle particles during mass harvest and planting.")
                 .define("satisfying_audio_cascade", true);
 
-        FARMERS_DELIGHT_KNIFE_COMPAT = builder
-                .comment("Allow Farmer's Delight / modded knives to harvest crops in an AOE, damaging the knife and dropping Straw.")
-                .define("farmers_delight_knife_compat", true);
-
         EXHAUSTION_PER_BLOCK = builder
                 .comment("Food exhaustion added per block hoed, planted, or harvested.")
                 .defineInRange("exhaustion_per_block", 0.02, 0.0, 1.0);
-
-        REQUIRE_SNEAK_FALLBACK = builder
-                .comment("If LiteMiner is not installed or active, require holding Sneak (Shift) to trigger.")
-                .define("require_sneak_fallback", true);
-
-        USE_LITEMINER_LIMIT = builder
-                .comment("If LiteMiner is installed, inherit its blockBreakLimit setting.")
-                .define("use_liteminer_limit", true);
 
         COLLECT_DROPS_AT_TARGET = builder
                 .comment("Gather all harvested item drops at the targeted block position instead of dropping them at each crop position.")

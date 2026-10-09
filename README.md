@@ -59,7 +59,7 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
      - **Anti-Overcrowding:** Prevents unnatural solid blobs (no 2x2 blocks or 3-way orthogonal clumping).
 5. **🍫 Cocoa Bean Trunk Planting:**
    * Right-click on Jungle Logs with Cocoa Beans to plant them on all available horizontal bark faces!
-6. **🔄 Context-Aware Intercropping (Xen Canh) (`smart_intercropping`):**
+6. **🔄 Context-Aware Intercropping (`smart_intercropping`):**
    * Hold one crop in your **Main Hand** (e.g., Carrot) and another in your **Off Hand** (e.g., Potato).
    * Plants strictly **alternating rows** (Carrot row, Potato row, Carrot row...) to grant the vanilla crop growth speed bonus!
    * Automatically synchronizes row parity with existing planted crops in the farm.
@@ -157,6 +157,8 @@ The configuration is saved automatically at `.minecraft/config/liteminer_farming
   max_blocks = 64
   # Maximum horizontal radius from the clicked block
   farming_radius = 8
+  # Send harvested items directly into the player's inventory instead of dropping them
+  harvest_to_inventory = false
   # Render real-time in-world preview highlight when mass farming key is held
   standalone_preview = true
   # 40/40 Inverted Checkerboard fruit stem planting (Melon & Pumpkin)
@@ -181,10 +183,6 @@ The configuration is saved automatically at `.minecraft/config/liteminer_farming
   damage_hoe_on_harvest = true
   # Food exhaustion per block
   exhaustion_per_block = 0.02
-  # Require Shift/Sneak if LiteMiner is not installed
-  require_sneak_fallback = true
-  # Inherit block limit from LiteMiner's config
-  use_liteminer_limit = true
 ```
 
 ---

@@ -654,7 +654,7 @@ public class PlantClassifier {
     }
 
     /**
-     * Strictly verifies if a seed/crop is eligible for alternating Intercropping (xen canh).
+     * Strictly verifies if a seed/crop is eligible for alternating Intercropping (companion planting).
      * Must be a farmland-only crop. Column crops (Sugar Cane/Bamboo/Cactus), Fruit seeds (Melon/Pumpkin),
      * Saplings, and Rice are strictly excluded so they are never forced into intercropping.
      */

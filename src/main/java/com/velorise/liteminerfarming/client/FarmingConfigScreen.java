@@ -8,6 +8,7 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.Screen;
@@ -34,12 +35,12 @@ public class FarmingConfigScreen extends Screen {
     private int flowerSparsity;
     private int maxBlocks;
     private int farmingRadius;
+    private boolean harvestToInventory;
     private boolean standalonePreview;
     private boolean smartMelonPumpkin;
     private boolean bedrockFlowerBonemeal;
     private boolean smartIntercropping;
     private boolean replantCrops;
-    private boolean harvestToInventory;
     private boolean preventToolBreaking;
     private boolean clearFoliage;
     private boolean batchComposter;
@@ -51,10 +52,7 @@ public class FarmingConfigScreen extends Screen {
     private boolean smartIrrigationPreview;
     private boolean growthPenaltyWarning;
     private boolean audioCascade;
-    private boolean knifeCompat;
     private double exhaustionPerBlock;
-    private boolean requireSneakFallback;
-    private boolean useLiteminerLimit;
 
     public FarmingConfigScreen(Screen parent) {
         super(Component.literal("Vein Farming Configuration"));
@@ -67,12 +65,12 @@ public class FarmingConfigScreen extends Screen {
         this.flowerSparsity = FarmingConfig.FLOWER_SPARSITY.get();
         this.maxBlocks = FarmingConfig.MAX_BLOCKS.get();
         this.farmingRadius = FarmingConfig.FARMING_RADIUS.get();
+        this.harvestToInventory = FarmingConfig.HARVEST_TO_INVENTORY.get();
         this.standalonePreview = FarmingConfig.STANDALONE_PREVIEW.get();
         this.smartMelonPumpkin = FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.get();
         this.bedrockFlowerBonemeal = FarmingConfig.BEDROCK_FLOWER_BONEMEAL.get();
         this.smartIntercropping = FarmingConfig.SMART_INTERCROPPING.get();
         this.replantCrops = FarmingConfig.REPLANT_CROPS.get();
-        this.harvestToInventory = FarmingConfig.HARVEST_TO_INVENTORY.get();
         this.preventToolBreaking = FarmingConfig.PREVENT_TOOL_BREAKING.get();
         this.clearFoliage = FarmingConfig.CLEAR_FOLIAGE.get();
         this.batchComposter = FarmingConfig.BATCH_COMPOSTER.get();
@@ -84,10 +82,7 @@ public class FarmingConfigScreen extends Screen {
         this.smartIrrigationPreview = FarmingConfig.SMART_IRRIGATION_PREVIEW.get();
         this.growthPenaltyWarning = FarmingConfig.GROWTH_PENALTY_WARNING.get();
         this.audioCascade = FarmingConfig.SATISFYING_AUDIO_CASCADE.get();
-        this.knifeCompat = FarmingConfig.FARMERS_DELIGHT_KNIFE_COMPAT.get();
         this.exhaustionPerBlock = FarmingConfig.EXHAUSTION_PER_BLOCK.get();
-        this.requireSneakFallback = FarmingConfig.REQUIRE_SNEAK_FALLBACK.get();
-        this.useLiteminerLimit = FarmingConfig.USE_LITEMINER_LIMIT.get();
     }
 
     private void saveValues() {
@@ -95,12 +90,12 @@ public class FarmingConfigScreen extends Screen {
         FarmingConfig.FLOWER_SPARSITY.set(this.flowerSparsity);
         FarmingConfig.MAX_BLOCKS.set(this.maxBlocks);
         FarmingConfig.FARMING_RADIUS.set(this.farmingRadius);
+        FarmingConfig.HARVEST_TO_INVENTORY.set(this.harvestToInventory);
         FarmingConfig.STANDALONE_PREVIEW.set(this.standalonePreview);
         FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.set(this.smartMelonPumpkin);
         FarmingConfig.BEDROCK_FLOWER_BONEMEAL.set(this.bedrockFlowerBonemeal);
         FarmingConfig.SMART_INTERCROPPING.set(this.smartIntercropping);
         FarmingConfig.REPLANT_CROPS.set(this.replantCrops);
-        FarmingConfig.HARVEST_TO_INVENTORY.set(this.harvestToInventory);
         FarmingConfig.PREVENT_TOOL_BREAKING.set(this.preventToolBreaking);
         FarmingConfig.CLEAR_FOLIAGE.set(this.clearFoliage);
         FarmingConfig.BATCH_COMPOSTER.set(this.batchComposter);
@@ -112,10 +107,7 @@ public class FarmingConfigScreen extends Screen {
         FarmingConfig.SMART_IRRIGATION_PREVIEW.set(this.smartIrrigationPreview);
         FarmingConfig.GROWTH_PENALTY_WARNING.set(this.growthPenaltyWarning);
         FarmingConfig.SATISFYING_AUDIO_CASCADE.set(this.audioCascade);
-        FarmingConfig.FARMERS_DELIGHT_KNIFE_COMPAT.set(this.knifeCompat);
         FarmingConfig.EXHAUSTION_PER_BLOCK.set(this.exhaustionPerBlock);
-        FarmingConfig.REQUIRE_SNEAK_FALLBACK.set(this.requireSneakFallback);
-        FarmingConfig.USE_LITEMINER_LIMIT.set(this.useLiteminerLimit);
 
         FarmingConfig.SPEC.save();
     }
@@ -125,12 +117,12 @@ public class FarmingConfigScreen extends Screen {
         this.flowerSparsity = 3;
         this.maxBlocks = 64;
         this.farmingRadius = 8;
+        this.harvestToInventory = false;
         this.standalonePreview = true;
         this.smartMelonPumpkin = true;
         this.bedrockFlowerBonemeal = true;
         this.smartIntercropping = true;
         this.replantCrops = true;
-        this.harvestToInventory = false;
         this.preventToolBreaking = true;
         this.clearFoliage = true;
         this.batchComposter = true;
@@ -142,10 +134,7 @@ public class FarmingConfigScreen extends Screen {
         this.smartIrrigationPreview = true;
         this.growthPenaltyWarning = true;
         this.audioCascade = true;
-        this.knifeCompat = true;
         this.exhaustionPerBlock = 0.02;
-        this.requireSneakFallback = true;
-        this.useLiteminerLimit = true;
 
         this.rebuildList();
     }
@@ -190,119 +179,152 @@ public class FarmingConfigScreen extends Screen {
 
         // --- 1. Primary Gameplay & Planting Controls (Top of list) ---
 
-        // Sapling Spacing Slider (0 = OFF, 1..8)
+        // 1. Sapling Spacing Slider (0 = OFF, 1..8)
         this.list.addConfigEntry(new IntSlider(0, 0, widgetWidth, widgetHeight,
                 "Sapling Spacing", "blocks", 0, 8, this.saplingSpacing, "OFF (Carpet)",
+                "Minimum block distance between planted saplings. Set to 0 to disable.",
                 val -> this.saplingSpacing = val));
 
-        // Flower & Flora Sparsity Slider (0 = OFF, 1..5)
+        // 2. Flower & Flora Sparsity Slider (0 = OFF, 1..5)
         this.list.addConfigEntry(new FlowerSparsitySlider(0, 0, widgetWidth, widgetHeight,
-                this.flowerSparsity, val -> this.flowerSparsity = val));
+                this.flowerSparsity,
+                "Scattering sparsity for flowers, ferns, and mushrooms. Set to 0 for dense carpet.",
+                val -> this.flowerSparsity = val));
 
-        // Max Blocks (16..512)
+        // 3. Max Farming Blocks (16..512)
         this.list.addConfigEntry(new IntSlider(0, 0, widgetWidth, widgetHeight,
                 "Max Farming Blocks", "blocks", 16, 512, this.maxBlocks, null,
+                "Maximum number of blocks affected in a single mass farming action.",
                 val -> this.maxBlocks = val));
 
-        // Farming Radius (2..32)
+        // 4. Farming Radius (2..32)
         this.list.addConfigEntry(new IntSlider(0, 0, widgetWidth, widgetHeight,
                 "Farming Radius", "blocks", 2, 32, this.farmingRadius, null,
+                "Maximum horizontal block distance from the targeted block.",
                 val -> this.farmingRadius = val));
 
-        // In-World Highlight Preview (ON/OFF)
+        // 5. Harvest Direct to Inventory (ON/OFF) - 5th slot
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "In-World Highlight Preview", this.standalonePreview, val -> this.standalonePreview = val));
+                "Harvest Direct to Inventory", this.harvestToInventory,
+                "Places harvested crops directly into your inventory instead of dropping them.",
+                val -> this.harvestToInventory = val));
 
-        // Smart Melon & Pumpkin (ON/OFF)
+        // 6. In-World Highlight Preview (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Smart Melon & Pumpkin", this.smartMelonPumpkin, val -> this.smartMelonPumpkin = val));
+                "In-World Highlight Preview", this.standalonePreview,
+                "Renders a 3D wireframe box around affected blocks when mass action key is held.",
+                val -> this.standalonePreview = val));
 
-        // Bedrock Flower Bone Meal (ON/OFF)
+        // 7. Smart Melon & Pumpkin (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Bedrock Flower Bone Meal", this.bedrockFlowerBonemeal, val -> this.bedrockFlowerBonemeal = val));
+                "Smart Melon & Pumpkin", this.smartMelonPumpkin,
+                "Plants melon and pumpkin stems in a 40/40 pattern so fruits have space to grow.",
+                val -> this.smartMelonPumpkin = val));
 
-        // Smart Intercropping (Xen Canh) (ON/OFF)
+        // 8. Bedrock Flower Bone Meal (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Smart Intercropping (Xen Canh)", this.smartIntercropping, val -> this.smartIntercropping = val));
+                "Bedrock Flower Bone Meal", this.bedrockFlowerBonemeal,
+                "Applying bone meal to small flowers spawns duplicate blooms nearby.",
+                val -> this.bedrockFlowerBonemeal = val));
 
-        // Auto-Replant Crops (ON/OFF)
+        // 9. Smart Intercropping (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Auto-Replant Crops", this.replantCrops, val -> this.replantCrops = val));
+                "Smart Intercropping", this.smartIntercropping,
+                "Plants alternating crop rows when holding different seeds in each hand for faster growth.",
+                val -> this.smartIntercropping = val));
 
-        // Harvest Direct to Inventory (ON/OFF)
+        // 10. Auto-Replant Crops (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Harvest Direct to Inventory", this.harvestToInventory, val -> this.harvestToInventory = val));
+                "Auto-Replant Crops", this.replantCrops,
+                "Automatically replants crops at age 0 using dropped or inventory seeds.",
+                val -> this.replantCrops = val));
 
-        // Prevent Tool Breaking (ON/OFF)
+        // 11. Prevent Tool Breaking (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Prevent Tool Breaking", this.preventToolBreaking, val -> this.preventToolBreaking = val));
+                "Prevent Tool Breaking", this.preventToolBreaking,
+                "Stops mass farming actions when your tool reaches 1 durability to prevent breaking.",
+                val -> this.preventToolBreaking = val));
 
-        // Clear Foliage when Hoeing (ON/OFF)
+        // 12. Clear Foliage when Hoeing (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Clear Foliage when Hoeing", this.clearFoliage, val -> this.clearFoliage = val));
+                "Clear Foliage when Hoeing", this.clearFoliage,
+                "Automatically clears weeds, grass, and flowers above dirt when tilling.",
+                val -> this.clearFoliage = val));
 
-        // Batch Composter (ON/OFF)
+        // 13. Batch Composter (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Batch Composter (1-Click)", this.batchComposter, val -> this.batchComposter = val));
+                "Batch Composter (1-Click)", this.batchComposter,
+                "Right-click a composter while holding Sneak to compost entire stacks instantly.",
+                val -> this.batchComposter = val));
 
         // --- 2. Secondary & Advanced Settings (Below) ---
 
-        // Smart Bone Meal Multi-Pass (ON/OFF)
+        // 14. Smart Bone Meal Multi-Pass (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Smart Bone Meal (Multi-Pass)", this.smartBonemeal, val -> this.smartBonemeal = val));
+                "Smart Bone Meal (Multi-Pass)", this.smartBonemeal,
+                "Continues applying bone meal to adjacent growing crops until fully mature.",
+                val -> this.smartBonemeal = val));
 
-        // Prevent Farmland Trample (ON/OFF)
+        // 15. Prevent Farmland Trample (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Prevent Farmland Trample", this.preventTrample, val -> this.preventTrample = val));
+                "Prevent Farmland Trample", this.preventTrample,
+                "Prevents farmland from reverting to dirt when jumped on by players or mobs.",
+                val -> this.preventTrample = val));
 
-        // Damage Hoe on Harvest (ON/OFF)
+        // 16. Damage Hoe on Harvest (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Damage Hoe on Harvest", this.damageHoeOnHarvest, val -> this.damageHoeOnHarvest = val));
+                "Damage Hoe on Harvest", this.damageHoeOnHarvest,
+                "Consumes hoe durability when right-click harvesting crops with a hoe.",
+                val -> this.damageHoeOnHarvest = val));
 
-        // Ghost Farmland 3D Preview (ON/OFF)
+        // 17. Ghost Farmland 3D Preview (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Ghost Farmland 3D Preview", this.ghostFarmlandPreview, val -> this.ghostFarmlandPreview = val));
+                "Ghost Farmland 3D Preview", this.ghostFarmlandPreview,
+                "Displays translucent farmland ghost preview with water hydration indicator.",
+                val -> this.ghostFarmlandPreview = val));
 
-        // Ghost Plant 3D Preview (ON/OFF)
+        // 18. Ghost Plant 3D Preview (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Ghost Plant 3D Preview", this.ghostPlantPreview, val -> this.ghostPlantPreview = val));
+                "Ghost Plant 3D Preview", this.ghostPlantPreview,
+                "Displays translucent plant preview at each valid planting location.",
+                val -> this.ghostPlantPreview = val));
 
-        // Smart Irrigation Preview (ON/OFF)
+        // 19. Smart Irrigation Preview (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Smart Irrigation Preview", this.smartIrrigationPreview, val -> this.smartIrrigationPreview = val));
+                "Smart Irrigation Preview", this.smartIrrigationPreview,
+                "Highlights unhydrated farmland lacking water and suggests water well locations.",
+                val -> this.smartIrrigationPreview = val));
 
-        // Growth Penalty Warning (ON/OFF)
+        // 20. Growth Penalty Warning (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Growth Penalty Warning", this.growthPenaltyWarning, val -> this.growthPenaltyWarning = val));
+                "Growth Penalty Warning", this.growthPenaltyWarning,
+                "Warns when planting crops in patterns that suffer vanilla 50% growth penalties.",
+                val -> this.growthPenaltyWarning = val));
 
-        // Satisfying Audio Cascade (ON/OFF)
+        // 21. Satisfying Audio Cascade (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Satisfying Audio Cascade", this.audioCascade, val -> this.audioCascade = val));
+                "Satisfying Audio Cascade", this.audioCascade,
+                "Plays musical ascending pitch chime notes during mass harvest and planting.",
+                val -> this.audioCascade = val));
 
-        // Farmer's Delight Knife Compat (ON/OFF)
-        this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Farmer's Delight Knife Compat", this.knifeCompat, val -> this.knifeCompat = val));
-
-        // Exhaustion Per Block Slider (0.00 .. 0.10)
+        // 22. Exhaustion Per Block Slider (0.00 .. 0.10)
         this.list.addConfigEntry(new ExhaustionSlider(0, 0, widgetWidth, widgetHeight,
-                this.exhaustionPerBlock, val -> this.exhaustionPerBlock = val));
-
-        // Require Sneak Fallback (ON/OFF)
-        this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Require Sneak Fallback", this.requireSneakFallback, val -> this.requireSneakFallback = val));
-
-        // Use LiteMiner Limit (ON/OFF)
-        this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Use LiteMiner Limit", this.useLiteminerLimit, val -> this.useLiteminerLimit = val));
+                this.exhaustionPerBlock,
+                "Hunger exhaustion added to the player per block affected.",
+                val -> this.exhaustionPerBlock = val));
     }
 
-    private static Button createBooleanButton(int width, int height, String label, boolean initial, Consumer<Boolean> onChange) {
+    private static Button createBooleanButton(int width, int height, String label, boolean initial, String tooltip, Consumer<Boolean> onChange) {
         boolean[] state = new boolean[]{initial};
-        return Button.builder(formatBooleanComponent(label, state[0]), btn -> {
+        Button button = Button.builder(formatBooleanComponent(label, state[0]), btn -> {
             state[0] = !state[0];
             btn.setMessage(formatBooleanComponent(label, state[0]));
             onChange.accept(state[0]);
         }).bounds(0, 0, width, height).build();
+        if (tooltip != null && !tooltip.isEmpty()) {
+            button.setTooltip(Tooltip.create(Component.literal(tooltip)));
+        }
+        return button;
     }
 
     private static Component formatBooleanComponent(String label, boolean state) {
@@ -379,7 +401,7 @@ public class FarmingConfigScreen extends Screen {
         private final Consumer<Integer> onChange;
 
         public IntSlider(int x, int y, int width, int height, String prefix, String suffix,
-                         int min, int max, int initial, String offLabel, Consumer<Integer> onChange) {
+                         int min, int max, int initial, String offLabel, String tooltip, Consumer<Integer> onChange) {
             super(x, y, width, height, Component.empty(), (double) (initial - min) / (max - min));
             this.prefix = prefix;
             this.suffix = suffix;
@@ -388,6 +410,9 @@ public class FarmingConfigScreen extends Screen {
             this.currentVal = initial;
             this.offLabel = offLabel;
             this.onChange = onChange;
+            if (tooltip != null && !tooltip.isEmpty()) {
+                this.setTooltip(Tooltip.create(Component.literal(tooltip)));
+            }
             this.updateMessage();
         }
 
@@ -413,10 +438,13 @@ public class FarmingConfigScreen extends Screen {
         private int currentVal;
         private final Consumer<Integer> onChange;
 
-        public FlowerSparsitySlider(int x, int y, int width, int height, int initial, Consumer<Integer> onChange) {
+        public FlowerSparsitySlider(int x, int y, int width, int height, int initial, String tooltip, Consumer<Integer> onChange) {
             super(x, y, width, height, Component.empty(), (double) initial / 5.0);
             this.currentVal = initial;
             this.onChange = onChange;
+            if (tooltip != null && !tooltip.isEmpty()) {
+                this.setTooltip(Tooltip.create(Component.literal(tooltip)));
+            }
             this.updateMessage();
         }
 
@@ -447,10 +475,13 @@ public class FarmingConfigScreen extends Screen {
         private double currentVal;
         private final Consumer<Double> onChange;
 
-        public ExhaustionSlider(int x, int y, int width, int height, double initial, Consumer<Double> onChange) {
+        public ExhaustionSlider(int x, int y, int width, int height, double initial, String tooltip, Consumer<Double> onChange) {
             super(x, y, width, height, Component.empty(), initial / 0.10);
             this.currentVal = initial;
             this.onChange = onChange;
+            if (tooltip != null && !tooltip.isEmpty()) {
+                this.setTooltip(Tooltip.create(Component.literal(tooltip)));
+            }
             this.updateMessage();
         }
 
