@@ -23,6 +23,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue SMART_SAPLING_PLANTING;
     public static final ModConfigSpec.IntValue SAPLING_MIN_SPACING;
     public static final ModConfigSpec.BooleanValue SMART_SAPLING_2X2;
+    public static final ModConfigSpec.BooleanValue GHOST_PLANT_PREVIEW;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -104,6 +105,10 @@ public class FarmingConfig {
         SMART_SAPLING_2X2 = builder
                 .comment("Automatically plant in 2x2 clusters for trees that support or require 2x2 grids (Dark Oak, Spruce, Jungle).")
                 .define("smart_sapling_2x2", true);
+
+        GHOST_PLANT_PREVIEW = builder
+                .comment("Display a faded translucent ghost preview of the sapling or plant at each valid planting location.")
+                .define("ghost_plant_preview", true);
 
         builder.pop();
         SPEC = builder.build();
