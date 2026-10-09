@@ -1,6 +1,6 @@
-package com.velorise.liteminerfarming.client;
+package com.velorise.veinfarming.client;
 
-import com.velorise.liteminerfarming.FarmingConfig;
+import com.velorise.veinfarming.FarmingConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;

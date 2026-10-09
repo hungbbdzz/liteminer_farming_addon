@@ -1,8 +1,8 @@
-package com.velorise.liteminerfarming.client;
+package com.velorise.veinfarming.client;
 
-import com.velorise.liteminerfarming.LiteMinerFarmingMod;
-import com.velorise.liteminerfarming.network.FarmingKeyPayload;
-import com.velorise.liteminerfarming.network.ToggleSmartPlantPayload;
+import com.velorise.veinfarming.VeinFarmingMod;
+import com.velorise.veinfarming.network.FarmingKeyPayload;
+import com.velorise.veinfarming.network.ToggleSmartPlantPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -16,7 +16,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * Handles client-side keybind detection, toggle events, and network syncing.
  */
-@EventBusSubscriber(modid = LiteMinerFarmingMod.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = VeinFarmingMod.MODID, value = Dist.CLIENT)
 public class ClientEventHandler {
 
     private static boolean lastKeyActive = false;
@@ -36,8 +36,8 @@ public class ClientEventHandler {
             PacketDistributor.sendToServer(new ToggleSmartPlantPayload(newState));
 
             Component msg = newState
-                    ? Component.translatable("message.liteminer_farming_addon.smart_plant.enabled").withStyle(ChatFormatting.GREEN)
-                    : Component.translatable("message.liteminer_farming_addon.smart_plant.disabled").withStyle(ChatFormatting.RED);
+                    ? Component.translatable("message.vein_farming.smart_plant.enabled").withStyle(ChatFormatting.GREEN)
+                    : Component.translatable("message.vein_farming.smart_plant.disabled").withStyle(ChatFormatting.RED);
             mc.player.displayClientMessage(msg, true);
         }
 
@@ -49,7 +49,7 @@ public class ClientEventHandler {
         }
     }
 
-    @EventBusSubscriber(modid = LiteMinerFarmingMod.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+    @EventBusSubscriber(modid = VeinFarmingMod.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
     public static class ModBusEvents {
         @SubscribeEvent
         public static void registerKeyMappings(RegisterKeyMappingsEvent event) {

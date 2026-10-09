@@ -145,7 +145,7 @@ No third-party configuration mods (like *Configured* or *Cloth Config*) required
 * Features **Reset Defaults**, **Cancel**, and **Done** buttons with instant persistence.
 
 ### 📄 Configuration File
-The configuration is saved automatically at `.minecraft/config/liteminer_farming_addon-common.toml`:
+The configuration is saved automatically at `.minecraft/config/vein_farming-common.toml`:
 
 ```toml
 [general]

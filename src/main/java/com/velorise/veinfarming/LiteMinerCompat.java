@@ -1,4 +1,4 @@
-package com.velorise.liteminerfarming;
+package com.velorise.veinfarming;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -47,7 +47,7 @@ public class LiteMinerCompat {
                 }
             }
         } catch (Throwable t) {
-            LiteMinerFarmingMod.LOGGER.error("Failed to get blocks from LiteMiner Walker", t);
+            VeinFarmingMod.LOGGER.error("Failed to get blocks from LiteMiner Walker", t);
         }
         return Collections.emptyList();
     }

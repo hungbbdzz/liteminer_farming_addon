@@ -12,28 +12,28 @@ authors="${mod_authors}"
 description="${mod_description}"
 logoFile="logo.png"
 
-[[dependencies.liteminer_farming_addon]]
+[[dependencies.vein_farming]]
 modId="neoforge"
 type="required"
 versionRange="${neo_version_range}"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.liteminer_farming_addon]]
+[[dependencies.vein_farming]]
 modId="minecraft"
 type="required"
 versionRange="${minecraft_version_range}"
 ordering="NONE"
 side="BOTH"
 
-[[dependencies.liteminer_farming_addon]]
+[[dependencies.vein_farming]]
 modId="liteminer"
 type="optional"
 versionRange="*"
 ordering="AFTER"
 side="BOTH"
 
-[[dependencies.liteminer_farming_addon]]
+[[dependencies.vein_farming]]
 modId="ftbultimine"
 type="optional"
 versionRange="*"

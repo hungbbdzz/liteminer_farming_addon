@@ -1,4 +1,4 @@
-package com.velorise.liteminerfarming;
+package com.velorise.veinfarming;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -34,7 +34,7 @@ public class FTBUltimineCompat {
                 }
             }
         } catch (Throwable t) {
-            LiteMinerFarmingMod.LOGGER.debug("FTB Ultimine reflection check failed", t);
+            VeinFarmingMod.LOGGER.debug("FTB Ultimine reflection check failed", t);
         }
         return false;
     }
@@ -54,7 +54,7 @@ public class FTBUltimineCompat {
                 return keyMapping.isDown();
             }
         } catch (Throwable t) {
-            LiteMinerFarmingMod.LOGGER.debug("FTB Ultimine client reflection check failed", t);
+            VeinFarmingMod.LOGGER.debug("FTB Ultimine client reflection check failed", t);
         }
         return false;
     }
@@ -138,7 +138,7 @@ public class FTBUltimineCompat {
                 return result;
             }
         } catch (Throwable t) {
-            LiteMinerFarmingMod.LOGGER.debug("FTB Ultimine getSelectedBlocks reflection failed", t);
+            VeinFarmingMod.LOGGER.debug("FTB Ultimine getSelectedBlocks reflection failed", t);
         }
         return java.util.Collections.emptyList();
     }
@@ -216,7 +216,7 @@ public class FTBUltimineCompat {
                 }
             }
         } catch (Throwable t) {
-            LiteMinerFarmingMod.LOGGER.debug("Failed to apply post FTB Ultimine costs", t);
+            VeinFarmingMod.LOGGER.debug("Failed to apply post FTB Ultimine costs", t);
         }
     }
 }

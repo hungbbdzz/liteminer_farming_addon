@@ -1,4 +1,4 @@
-package com.velorise.liteminerfarming;
+package com.velorise.veinfarming;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;

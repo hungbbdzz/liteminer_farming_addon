@@ -1,0 +1,20 @@
+{
+  "mod.vein_farming.name": "Vein Farming: Universal Crop Harvester",
+  "mod.vein_farming.description": "Universal AOE farming for Standalone mode, LiteMiner, or FTB Ultimine. Area Tilling, Smart Mass Planting, and AOE Bone Meal fertilizing.",
+  "key.categories.vein_farming": "Vein Farming",
+  "key.vein_farming.activate": "Farming Veinmine / Mass Action",
+  "key.vein_farming.toggle_smart_plant": "Toggle Smart Planting",
+  "message.vein_farming.smart_plant.enabled": "Smart Planting: ENABLED",
+  "message.vein_farming.smart_plant.disabled": "Smart Planting: DISABLED",
+  "config.vein_farming.general": "General Settings",
+  "config.vein_farming.max_blocks": "Maximum Blocks Affected",
+  "config.vein_farming.farming_radius": "Farming Radius",
+  "config.vein_farming.harvest_to_inventory": "Harvest Direct to Inventory",
+  "config.vein_farming.sapling_min_spacing": "Sapling Minimum Spacing",
+  "config.vein_farming.flower_sparsity": "Flower & Flora Sparsity",
+  "config.vein_farming.prevent_tool_breaking": "Prevent Tool Breaking",
+  "config.vein_farming.pull_from_inventory": "Pull Seeds & Bone Meal from Inventory",
+  "config.vein_farming.clear_foliage": "Clear Replaceable Foliage when Hoeing",
+  "config.vein_farming.exhaustion_per_block": "Exhaustion Per Block",
+  "config.vein_farming.bedrock_flower_bonemeal": "Bedrock-style Flower Bone Meal Propagation"
+}

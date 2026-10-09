@@ -1,6 +1,6 @@
-package com.velorise.liteminerfarming.network;
+package com.velorise.veinfarming.network;
 
-import com.velorise.liteminerfarming.LiteMinerFarmingMod;
+import com.velorise.veinfarming.VeinFarmingMod;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -13,7 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 public record ToggleSmartPlantPayload(boolean enabled) implements CustomPacketPayload {
 
     public static final Type<ToggleSmartPlantPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(LiteMinerFarmingMod.MODID, "toggle_smart_plant")
+            ResourceLocation.fromNamespaceAndPath(VeinFarmingMod.MODID, "toggle_smart_plant")
     );
 
     public static final StreamCodec<FriendlyByteBuf, ToggleSmartPlantPayload> STREAM_CODEC = StreamCodec.composite(

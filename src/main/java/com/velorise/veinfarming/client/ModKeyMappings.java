@@ -1,7 +1,7 @@
-package com.velorise.liteminerfarming.client;
+package com.velorise.veinfarming.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import com.velorise.liteminerfarming.FarmingConfig;
+import com.velorise.veinfarming.FarmingConfig;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
@@ -9,17 +9,17 @@ import org.lwjgl.glfw.GLFW;
 public final class ModKeyMappings {
 
     public static final KeyMapping KEY_ACTIVATE = new KeyMapping(
-            "key.liteminer_farming_addon.activate",
+            "key.vein_farming.activate",
             InputConstants.Type.KEYSYM,
             GLFW.GLFW_KEY_LEFT_SHIFT,
-            "key.categories.liteminer_farming_addon"
+            "key.categories.vein_farming"
     );
 
     public static final KeyMapping KEY_TOGGLE_SMART_PLANT = new KeyMapping(
-            "key.liteminer_farming_addon.toggle_smart_plant",
+            "key.vein_farming.toggle_smart_plant",
             InputConstants.Type.KEYSYM,
             InputConstants.UNKNOWN.getValue(),
-            "key.categories.liteminer_farming_addon"
+            "key.categories.vein_farming"
     );
 
     private static boolean smartPlantEnabled = true;

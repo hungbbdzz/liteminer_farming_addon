@@ -1,6 +1,6 @@
-package com.velorise.liteminerfarming.network;
+package com.velorise.veinfarming.network;
 
-import com.velorise.liteminerfarming.LiteMinerFarmingMod;
+import com.velorise.veinfarming.VeinFarmingMod;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -13,7 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 public record FarmingKeyPayload(boolean active) implements CustomPacketPayload {
 
     public static final Type<FarmingKeyPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(LiteMinerFarmingMod.MODID, "key_state")
+            ResourceLocation.fromNamespaceAndPath(VeinFarmingMod.MODID, "key_state")
     );
 
     public static final StreamCodec<FriendlyByteBuf, FarmingKeyPayload> STREAM_CODEC = StreamCodec.composite(

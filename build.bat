@@ -1,6 +1,6 @@
 @echo off
 setlocal
-echo [LiteMiner Farming Addon] Building mod jar...
+echo [Vein Farming] Building mod jar...
 call gradlew.bat build
 
 if %ERRORLEVEL% NEQ 0 (

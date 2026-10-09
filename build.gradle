@@ -29,7 +29,7 @@ neoForge {
     }
 
     mods {
-        "liteminer_farming_addon" {
+        "vein_farming" {
             sourceSet sourceSets.main
         }
     }

@@ -1,8 +1,8 @@
-package com.velorise.liteminerfarming.client;
+package com.velorise.veinfarming.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.velorise.liteminerfarming.*;
+import com.velorise.veinfarming.*;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
