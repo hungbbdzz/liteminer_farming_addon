@@ -923,7 +923,88 @@ public class FarmingManager {
                 }
             }
         }
+        return isRiceCrop(state);
+    }
+
+    /**
+     * Checks if a block is Farmer's Delight Rice (submerged rice crop or upper rice panicles).
+     */
+    public static boolean isRiceCrop(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        Block b = state.getBlock();
+        String id = b.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("rice_panicles") || id.contains("rice_crop") || (id.contains("rice") && (b instanceof CropBlock || b instanceof BushBlock));
+    }
+
+    /**
+     * Checks if an item is a tool used for breaking/destroying crops and blocks.
+     */
+    public static boolean isDestructionTool(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return stack.is(ItemTags.AXES)
+                || stack.is(ItemTags.PICKAXES)
+                || stack.is(ItemTags.SHOVELS)
+                || stack.is(ItemTags.SWORDS)
+                || stack.is(ItemTags.HOES)
+                || stack.is(Items.SHEARS);
+    }
+
+    /**
+     * Universal check for column crop item stacks (Sugar Cane, Cactus, Bamboo, Kelp).
+     */
+    public static boolean isColumnCrop(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (stack.is(Items.SUGAR_CANE) || stack.is(Items.CACTUS) || stack.is(Items.BAMBOO) || stack.is(Items.KELP)) {
+            return true;
+        }
+        Item item = stack.getItem();
+        if (item instanceof BlockItem blockItem) {
+            return isColumnCrop(blockItem.getBlock().defaultBlockState());
+        }
         return false;
+    }
+
+    /**
+     * Strictly verifies if a seed/crop is eligible for alternating Intercropping (xen canh).
+     * Must be a farmland-only crop. Column crops (Sugar Cane/Bamboo/Cactus), Fruit seeds (Melon/Pumpkin),
+     * Saplings, and Rice are strictly excluded so they are never forced into intercropping.
+     */
+    public static boolean isIntercroppableCrop(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (isColumnCrop(stack) || isFruitSeed(stack) || isSapling(stack)) {
+            return false;
+        }
+        if (stack.is(Items.NETHER_WART) || stack.is(Items.COCOA_BEANS) || stack.is(Items.SWEET_BERRIES) || stack.is(Items.KELP)) {
+            return false;
+        }
+        String itemId = stack.getItem().getDescriptionId().toLowerCase(Locale.ROOT);
+        if (itemId.contains("rice")) {
+            return false;
+        }
+        Item item = stack.getItem();
+        if (item instanceof BlockItem blockItem) {
+            Block block = blockItem.getBlock();
+            if (block instanceof StemBlock || block instanceof AttachedStemBlock) {
+                return false;
+            }
+            if (block instanceof CropBlock) {
+                return true;
+            }
+        }
+        if (stack.is(Items.WHEAT_SEEDS) || stack.is(Items.CARROT) || stack.is(Items.POTATO)
+                || stack.is(Items.BEETROOT_SEEDS) || stack.is(Items.TORCHFLOWER_SEEDS) || stack.is(Items.PITCHER_POD)) {
+            return true;
+        }
+        Block cropBlock = getCropBlock(stack);
+        return isFarmlandCrop(cropBlock.defaultBlockState());
     }
 
     /**
@@ -968,6 +1049,7 @@ public class FarmingManager {
                 || isColumnCrop(state)
                 || isFruitCrop(state)
                 || isStem(state)
+                || isRiceCrop(state)
                 || state.getBlock() instanceof NetherWartBlock
                 || state.getBlock() instanceof CocoaBlock
                 || state.getBlock() instanceof SweetBerryBushBlock
@@ -1515,10 +1597,9 @@ public class FarmingManager {
 
         ItemStack offHandStack = player.getItemInHand(InteractionHand.OFF_HAND);
         boolean isIntercropping = FarmingConfig.SMART_INTERCROPPING.get()
-                && isPlantableSeed(seedStack)
-                && isPlantableSeed(offHandStack)
-                && !seedStack.is(offHandStack.getItem())
-                && !isSapling(seedStack) && !isSapling(offHandStack);
+                && isIntercroppableCrop(seedStack)
+                && isIntercroppableCrop(offHandStack)
+                && !seedStack.is(offHandStack.getItem());
 
         Direction facing = player.getDirection();
         Item mainSeedItem = seedItem;
@@ -2238,12 +2319,57 @@ public class FarmingManager {
         return false;
     }
 
-    public static Collection<BlockPos> findDestroyTargets(ServerLevel level, BlockPos clickedPos, BlockState clickedState) {
+    public static Collection<BlockPos> findDestroyTargets(Level level, BlockPos clickedPos, BlockState clickedState) {
         int maxLimit = FarmingConfig.MAX_BLOCKS.get();
         int radius = FarmingConfig.FARMING_RADIUS.get();
         Set<BlockPos> visited = new HashSet<>();
         List<BlockPos> result = new ArrayList<>();
         Queue<BlockPos> queue = new ArrayDeque<>();
+
+        // Rice (Farmer's Delight): wipe both submerged crops and upper panicles
+        if (isRiceCrop(clickedState) || isRiceCrop(level.getBlockState(clickedPos.above()))) {
+            BlockPos start = isRiceCrop(clickedState) ? clickedPos : clickedPos.above();
+            queue.add(start);
+            visited.add(start);
+
+            while (!queue.isEmpty() && result.size() < maxLimit) {
+                BlockPos curr = queue.poll();
+                BlockState currState = level.getBlockState(curr);
+                if (isRiceCrop(currState) && !result.contains(curr)) {
+                    result.add(curr);
+                }
+                BlockPos below = curr.below();
+                if (isRiceCrop(level.getBlockState(below)) && !result.contains(below)) {
+                    result.add(below);
+                }
+                BlockPos above = curr.above();
+                if (isRiceCrop(level.getBlockState(above)) && !result.contains(above)) {
+                    result.add(above);
+                }
+
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            BlockPos next = curr.offset(dx, dy, dz);
+                            if (visited.contains(next)) continue;
+                            if (Math.abs(next.getX() - start.getX()) > radius
+                                    || Math.abs(next.getZ() - start.getZ()) > radius
+                                    || Math.abs(next.getY() - start.getY()) > 2) {
+                                continue;
+                            }
+
+                            BlockState nextState = level.getBlockState(next);
+                            if (isRiceCrop(nextState) || isRiceCrop(level.getBlockState(next.below())) || isRiceCrop(level.getBlockState(next.above()))) {
+                                visited.add(next);
+                                queue.add(next);
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
 
         if (isColumnCrop(clickedState)) {
             BlockPos startRoot = getColumnCropRoot(level, clickedPos);
@@ -2348,7 +2474,7 @@ public class FarmingManager {
                             }
 
                             BlockState nextState = level.getBlockState(next);
-                            if (nextState.getBlock() instanceof NetherWartBlock || isSoulSand(nextState)) {
+                            if (nextState.getBlock() instanceof NetherWartBlock) {
                                 visited.add(next);
                                 queue.add(next);
                             }
@@ -2466,6 +2592,9 @@ public class FarmingManager {
         if (isFarmland(startState) || isSoulSand(startState)) {
             actualCropPos = startPos.above();
             startState = level.getBlockState(actualCropPos);
+        } else if (isRiceCrop(startState) && isRiceCrop(level.getBlockState(startPos.above()))) {
+            actualCropPos = startPos.above();
+            startState = level.getBlockState(actualCropPos);
         }
 
         boolean targetColumn = isColumnCrop(startState);
@@ -2474,6 +2603,7 @@ public class FarmingManager {
         boolean targetVines = startState.getBlock() instanceof CaveVines || startState.is(Blocks.CAVE_VINES) || startState.is(Blocks.CAVE_VINES_PLANT);
         boolean targetCocoa = startState.getBlock() instanceof CocoaBlock;
         boolean targetNetherWart = startState.getBlock() instanceof NetherWartBlock;
+        boolean targetRice = isRiceCrop(startState);
 
         // If column crop, normalize root and traverse horizontally across adjacent column roots
         if (targetColumn) {
@@ -2549,6 +2679,12 @@ public class FarmingManager {
                 if (curState.getBlock() instanceof NetherWartBlock && isMatureCrop(curState)) {
                     result.add(current);
                 }
+            } else if (targetRice) {
+                if (isRiceCrop(curState) && isMatureCrop(curState)) {
+                    if (!result.contains(current)) {
+                        result.add(current);
+                    }
+                }
             } else {
                 // Farmland crops (Wheat, Carrot, Potato, Beetroot, Pitcher Crop, Torchflower, and modded CropBlocks)
                 BlockPos harvestPos = current;
@@ -2600,6 +2736,10 @@ public class FarmingManager {
                             if (nextState.getBlock() instanceof NetherWartBlock || isSoulSand(nextState)) {
                                 canTraverse = true;
                             }
+                        } else if (targetRice) {
+                            if (isRiceCrop(nextState) || isRiceCrop(level.getBlockState(next.below())) || isRiceCrop(level.getBlockState(next.above()))) {
+                                canTraverse = true;
+                            }
                         } else {
                             // Farmland crops: traverse connected Farmland or crops planted on Farmland!
                             if (isFarmland(nextState)) {
@@ -2608,7 +2748,7 @@ public class FarmingManager {
                                     canTraverse = true;
                                 }
                             } else if (isFarmlandCrop(nextState)) {
-                                if (isFarmland(level.getBlockState(next.below()))) {
+                                if (isFarmland(level.getBlockState(next.below())) || isRiceCrop(nextState) || isRiceCrop(level.getBlockState(next.below()))) {
                                     canTraverse = true;
                                 }
                             }

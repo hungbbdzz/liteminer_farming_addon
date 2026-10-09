@@ -49,11 +49,14 @@ public class StandaloneHighlightRenderer {
     private BlockState cachedGhostPlantState = null;
     private BlockState cachedGhostOffState = null;
 
+    private boolean lastWasAttacking = false;
+
     private void clearCache() {
         lastClickedPos = null;
         lastClickedState = null;
         lastHeldItem = ItemStack.EMPTY;
         lastOffItem = ItemStack.EMPTY;
+        lastWasAttacking = false;
         lastCacheTime = 0L;
         cachedPreviewBlocks = Collections.emptyList();
         cachedIsHoe = false;
@@ -114,11 +117,13 @@ public class StandaloneHighlightRenderer {
 
         // Check if cached search result is still valid (throttle search to at most once per 250ms when looking at same block)
         long now = System.currentTimeMillis();
+        boolean isAttacking = mc.options.keyAttack.isDown();
         boolean cacheValid = lastClickedPos != null
                 && lastClickedPos.equals(clickedPos)
                 && clickedState.equals(lastClickedState)
                 && ItemStack.matches(heldItem, lastHeldItem)
                 && ItemStack.matches(offItem, lastOffItem)
+                && (isAttacking == lastWasAttacking)
                 && (now - lastCacheTime < 250);
 
         Collection<BlockPos> previewBlocks;
@@ -143,20 +148,37 @@ public class StandaloneHighlightRenderer {
             ghostPlantState = null;
             ghostOffState = null;
 
-            BlockPos targetCrop = (FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState)) 
-                    ? clickedPos 
-                    : clickedPos.above();
+            BlockPos targetCrop = clickedPos;
+            if (FarmingManager.isRiceCrop(clickedState)) {
+                if (FarmingManager.isRiceCrop(level.getBlockState(clickedPos.above()))) {
+                    targetCrop = clickedPos.above();
+                }
+            } else if (!FarmingManager.isCrop(clickedState) && !FarmingManager.isColumnCrop(clickedState) && !FarmingManager.isFruitCrop(clickedState) && !FarmingManager.isHarvestablePlant(clickedState)) {
+                targetCrop = clickedPos.above();
+            }
             BlockState targetCropState = level.getBlockState(targetCrop);
 
             boolean isHarvestable = FarmingManager.isMatureCrop(targetCropState)
                     || FarmingManager.isFruitCrop(targetCropState)
                     || FarmingManager.isFruitCrop(clickedState)
-                    || FarmingManager.isColumnCrop(targetCropState);
+                    || FarmingManager.isColumnCrop(targetCropState)
+                    || (FarmingManager.isRiceCrop(targetCropState) && FarmingManager.isMatureCrop(targetCropState));
 
-            if (isHarvestable) {
-                // Harvest mature crops with ANY item or bare hand!
+            boolean isPlant = FarmingManager.isHarvestablePlant(targetCropState)
+                    || FarmingManager.isHarvestablePlant(clickedState)
+                    || FarmingManager.isRiceCrop(targetCropState)
+                    || FarmingManager.isRiceCrop(clickedState);
+
+            boolean isTool = FarmingManager.isDestructionTool(heldItem);
+
+            if (isPlant && (isAttacking || isTool || !isHarvestable)) {
+                // DESTROY PREVIEW (Left-click / Breaking Mode) - Vivid Crimson Red
+                previewBlocks = FarmingManager.findDestroyTargets(level, targetCrop, targetCropState);
+                r = 1.0f; g = 0.22f; b = 0.22f; a = 0.85f;
+            } else if (isHarvestable) {
+                // HARVEST PREVIEW (Right-click Harvest Mode) - Golden Autumn Harvest
                 previewBlocks = FarmingManager.fallbackHarvestSearch(level, targetCrop);
-                r = 1.0f; g = 0.82f; b = 0.2f; // Golden Autumn Harvest
+                r = 1.0f; g = 0.82f; b = 0.2f; a = 0.8f;
             } else if (clickedState.is(Blocks.COMPOSTER) && FarmingConfig.BATCH_COMPOSTER.get() && FarmingManager.isCompostable(heldItem)) {
                 previewBlocks = Collections.singletonList(clickedPos);
                 r = 0.45f; g = 0.75f; b = 0.25f; // Compost Green
@@ -174,10 +196,9 @@ public class StandaloneHighlightRenderer {
                 if (FarmingConfig.GHOST_PLANT_PREVIEW.get()) {
                     ghostPlantState = getPlantedBlockState(heldItem);
                     if (FarmingConfig.SMART_INTERCROPPING.get()
-                            && FarmingManager.isPlantableSeed(offItem)
-                            && !heldItem.is(offItem.getItem())
-                            && !FarmingManager.isSapling(heldItem)
-                            && !FarmingManager.isSapling(offItem)) {
+                            && FarmingManager.isIntercroppableCrop(heldItem)
+                            && FarmingManager.isIntercroppableCrop(offItem)
+                            && !heldItem.is(offItem.getItem())) {
                         ghostOffState = getPlantedBlockState(offItem);
                     }
                 }
@@ -195,6 +216,7 @@ public class StandaloneHighlightRenderer {
             lastClickedState = clickedState;
             lastHeldItem = heldItem.copy();
             lastOffItem = offItem.copy();
+            lastWasAttacking = isAttacking;
             lastCacheTime = now;
             cachedPreviewBlocks = previewBlocks;
             cachedR = r; cachedG = g; cachedB = b; cachedA = a;
