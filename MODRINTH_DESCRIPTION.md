@@ -27,10 +27,16 @@ It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, 
 * **Smart Inventory Replenishment:** If the stack in your hand runs out, the mod automatically consumes matching seeds from your inventory.
 
 ### 3. 🦴 AOE Bone Meal (Fertilizing)
-
 * Hold **Bone Meal** and **Right-click** on crops with your LiteMiner key active.
 * Automatically fertilizes all eligible crops in the selected area!
 * Spawns standard green growth particles and sounds, and replenishes bone meal from your inventory when needed.
+
+### 4. 🌾 Mass Harvesting (AOE Harvest & Replant)
+* **Right-click** on any mature crop (`Wheat`, `Carrot`, `Potato`, `Beetroot`, `Nether Wart`, `Cocoa`, `Sweet Berry Bush`, or modded crops like **Farmer's Delight**) with your LiteMiner key active (or `Shift/Sneak`).
+* Works with an **empty hand**, holding a **Hoe**, or any tool!
+* All mature crops in your active shape are harvested instantly and automatically **replanted** at age 0 using dropped or inventory seeds.
+* Immature crops are left unharmed to keep growing!
+* Fully compatible with **Fortune** enchantments if holding an enchanted tool.
 
 ---
 
@@ -38,8 +44,8 @@ It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, 
 
 1. Make sure **LiteMiner** is installed.
 2. Select your desired shape in LiteMiner (e.g. `3x3`, `Shapeless`, etc.).
-3. Hold your LiteMiner veinmine key (`~` by default). The blue/cyan highlight shows the exact target blocks!
-4. **Right-click** with a Hoe, Seeds, or Bone Meal!
+3. Hold your LiteMiner veinmine key (`~` by default). The highlight shows the exact target blocks!
+4. **Right-click** with a Hoe, Seeds, Bone Meal, or empty hand on mature crops!
 
 > **Note:** If LiteMiner is not installed, the mod gracefully falls back to holding `Sneak (Shift)`.
 
@@ -51,7 +57,7 @@ The config file is located at `.minecraft/config/liteminer_farming_addon-common.
 
 ```toml
 [general]
-  # Maximum number of blocks to hoe, plant, or fertilize in a single action
+  # Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action
   max_blocks = 64
   # Inherit block limit from LiteMiner's config
   use_liteminer_limit = true
@@ -67,6 +73,12 @@ The config file is located at `.minecraft/config/liteminer_farming_addon-common.
   exhaustion_per_block = 0.02
   # Require Shift/Sneak if LiteMiner is not installed
   require_sneak_fallback = true
+  # Enable AOE mass harvesting of mature crops
+  enable_mass_harvest = true
+  # Automatically replant harvested crops at age 0 using dropped or inventory seeds
+  replant_crops = true
+  # If holding a hoe when mass harvesting, consume durability per crop
+  damage_hoe_on_harvest = true
 ```
 
 ---

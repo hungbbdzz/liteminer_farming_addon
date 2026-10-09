@@ -9,6 +9,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.ItemAbilities;
@@ -30,9 +31,6 @@ public class FarmingEventHandler {
 
         InteractionHand hand = event.getHand();
         ItemStack heldItem = player.getItemInHand(hand);
-        if (heldItem.isEmpty()) {
-            return;
-        }
 
         // Check if activation condition is met
         boolean active = false;
@@ -53,6 +51,28 @@ public class FarmingEventHandler {
         BlockPos clickedPos = event.getPos();
         Direction clickedFace = event.getFace();
         if (clickedFace == Direction.DOWN) {
+            return;
+        }
+
+        BlockState clickedState = level.getBlockState(clickedPos);
+
+        // 1. Mass Harvesting (AOE Harvest & Replant)
+        // Works with empty hand, hoe, or any held item when targeting a mature crop (or farmland with a mature crop)
+        boolean isDirectCrop = FarmingManager.isMatureCrop(clickedState);
+        boolean isFarmlandWithCrop = FarmingManager.isFarmland(clickedState) && FarmingManager.isMatureCrop(level.getBlockState(clickedPos.above()));
+
+        if (isDirectCrop || isFarmlandWithCrop) {
+            BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
+            boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
+            if (handled) {
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCanceled(true);
+                return;
+            }
+        }
+
+        // If hand is empty and harvest didn't trigger, nothing more to do
+        if (heldItem.isEmpty()) {
             return;
         }
 

@@ -12,6 +12,9 @@ public class FarmingConfig {
     public static final ModConfigSpec.DoubleValue EXHAUSTION_PER_BLOCK;
     public static final ModConfigSpec.BooleanValue REQUIRE_SNEAK_FALLBACK;
     public static final ModConfigSpec.BooleanValue USE_LITEMINER_LIMIT;
+    public static final ModConfigSpec.BooleanValue ENABLE_MASS_HARVEST;
+    public static final ModConfigSpec.BooleanValue REPLANT_CROPS;
+    public static final ModConfigSpec.BooleanValue DAMAGE_HOE_ON_HARVEST;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -19,7 +22,7 @@ public class FarmingConfig {
         builder.push("general");
 
         MAX_BLOCKS = builder
-                .comment("Maximum number of blocks to hoe or plant in a single action.")
+                .comment("Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action.")
                 .defineInRange("max_blocks", 64, 1, 512);
 
         FARMING_RADIUS = builder
@@ -27,7 +30,7 @@ public class FarmingConfig {
                 .defineInRange("farming_radius", 8, 1, 32);
 
         PREVENT_TOOL_BREAKING = builder
-                .comment("Prevent tools from breaking during mass hoeing.")
+                .comment("Prevent tools from breaking during mass farming actions.")
                 .define("prevent_tool_breaking", true);
 
         PULL_FROM_INVENTORY = builder
@@ -39,7 +42,7 @@ public class FarmingConfig {
                 .define("clear_foliage", true);
 
         EXHAUSTION_PER_BLOCK = builder
-                .comment("Food exhaustion added per block hoed or planted.")
+                .comment("Food exhaustion added per block hoed, planted, or harvested.")
                 .defineInRange("exhaustion_per_block", 0.02, 0.0, 1.0);
 
         REQUIRE_SNEAK_FALLBACK = builder
@@ -49,6 +52,18 @@ public class FarmingConfig {
         USE_LITEMINER_LIMIT = builder
                 .comment("If LiteMiner is installed, inherit its blockBreakLimit setting.")
                 .define("use_liteminer_limit", true);
+
+        ENABLE_MASS_HARVEST = builder
+                .comment("Enable AOE mass harvesting of mature crops.")
+                .define("enable_mass_harvest", true);
+
+        REPLANT_CROPS = builder
+                .comment("Automatically replant harvested crops at age 0 using dropped or inventory seeds.")
+                .define("replant_crops", true);
+
+        DAMAGE_HOE_ON_HARVEST = builder
+                .comment("If holding a hoe when mass harvesting, consume durability per crop.")
+                .define("damage_hoe_on_harvest", true);
 
         builder.pop();
         SPEC = builder.build();
