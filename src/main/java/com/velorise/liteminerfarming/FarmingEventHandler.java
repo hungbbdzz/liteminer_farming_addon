@@ -9,6 +9,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.HoeItem;
@@ -132,6 +133,16 @@ public class FarmingEventHandler {
             return;
         }
 
+        // 0. Batch Composter (1-Click mass composting)
+        if (clickedState.is(Blocks.COMPOSTER) && FarmingConfig.BATCH_COMPOSTER.get() && FarmingManager.isCompostable(heldItem)) {
+            boolean handled = FarmingManager.handleBatchCompost(serverPlayer, hand, heldItem, clickedPos);
+            if (handled) {
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCanceled(true);
+                return;
+            }
+        }
+
         // 1. Mass Harvesting (AOE Harvest & Replant)
         if (!heldItem.is(Items.BONE_MEAL)) {
             boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState);
@@ -232,6 +243,9 @@ public class FarmingEventHandler {
                     || FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below())) {
                 return true;
             }
+        }
+        if (clickedState.is(Blocks.COMPOSTER) && FarmingConfig.BATCH_COMPOSTER.get() && FarmingManager.isCompostable(heldItem)) {
+            return true;
         }
         boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState);
         boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState);

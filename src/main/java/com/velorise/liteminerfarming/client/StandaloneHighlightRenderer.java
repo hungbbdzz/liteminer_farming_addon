@@ -39,6 +39,7 @@ public class StandaloneHighlightRenderer {
     private Collection<BlockPos> cachedPreviewBlocks = Collections.emptyList();
     private float cachedR = 1.0f, cachedG = 0.82f, cachedB = 0.2f, cachedA = 0.8f;
     private boolean cachedIsPlanting = false;
+    private boolean cachedIsHoe = false;
     private BlockState cachedGhostPlantState = null;
     private BlockState cachedGhostOffState = null;
 
@@ -49,6 +50,7 @@ public class StandaloneHighlightRenderer {
         lastOffItem = ItemStack.EMPTY;
         lastCacheTime = 0L;
         cachedPreviewBlocks = Collections.emptyList();
+        cachedIsHoe = false;
         cachedGhostPlantState = null;
         cachedGhostOffState = null;
     }
@@ -116,6 +118,7 @@ public class StandaloneHighlightRenderer {
         Collection<BlockPos> previewBlocks;
         float r, g, b, a;
         boolean isPlanting;
+        boolean isHoe;
         BlockState ghostPlantState;
         BlockState ghostOffState;
 
@@ -123,12 +126,14 @@ public class StandaloneHighlightRenderer {
             previewBlocks = cachedPreviewBlocks;
             r = cachedR; g = cachedG; b = cachedB; a = cachedA;
             isPlanting = cachedIsPlanting;
+            isHoe = cachedIsHoe;
             ghostPlantState = cachedGhostPlantState;
             ghostOffState = cachedGhostOffState;
         } else {
             previewBlocks = Collections.emptyList();
             r = 1.0f; g = 0.82f; b = 0.2f; a = 0.8f; // Default golden harvest
             isPlanting = false;
+            isHoe = false;
             ghostPlantState = null;
             ghostOffState = null;
 
@@ -146,9 +151,13 @@ public class StandaloneHighlightRenderer {
                 // Harvest mature crops with ANY item or bare hand!
                 previewBlocks = FarmingManager.fallbackHarvestSearch(level, targetCrop);
                 r = 1.0f; g = 0.82f; b = 0.2f; // Golden Autumn Harvest
+            } else if (clickedState.is(Blocks.COMPOSTER) && FarmingConfig.BATCH_COMPOSTER.get() && FarmingManager.isCompostable(heldItem)) {
+                previewBlocks = Collections.singletonList(clickedPos);
+                r = 0.45f; g = 0.75f; b = 0.25f; // Compost Green
             } else if (FarmingEventHandler.isHoe(heldItem) && FarmingManager.isTillable(level, player, hand, clickedPos)) {
                 previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
                 r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
+                isHoe = true;
             } else if (FarmingManager.isPlantableSeed(heldItem) && (
                     (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) && (level.getBlockState(clickedPos.above()).isAir() || level.getBlockState(clickedPos.above()).canBeReplaced()))
                     || (FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()) && (clickedState.isAir() || clickedState.canBeReplaced()))
@@ -184,6 +193,7 @@ public class StandaloneHighlightRenderer {
             cachedPreviewBlocks = previewBlocks;
             cachedR = r; cachedG = g; cachedB = b; cachedA = a;
             cachedIsPlanting = isPlanting;
+            cachedIsHoe = isHoe;
             cachedGhostPlantState = ghostPlantState;
             cachedGhostOffState = ghostOffState;
         }
@@ -214,7 +224,18 @@ public class StandaloneHighlightRenderer {
                         : shape.bounds().move(renderPos);
             }
             net.minecraft.world.phys.AABB camRelative = aabb.move(-camPos.x, -camPos.y, -camPos.z);
-            LevelRenderer.renderLineBox(poseStack, consumer, camRelative, r, g, b, lineAlpha);
+
+            float boxR = r, boxG = g, boxB = b;
+            if (isHoe && FarmingConfig.SMART_IRRIGATION_PREVIEW.get()) {
+                boolean hasWater = FarmingManager.isNearWater(level, pos);
+                if (hasWater) {
+                    boxR = 0.45f; boxG = 0.65f; boxB = 0.35f; // Hydrated Farmland Green-Brown
+                } else {
+                    boxR = 0.95f; boxG = 0.45f; boxB = 0.15f; // Warning Dry Amber/Orange
+                }
+            }
+
+            LevelRenderer.renderLineBox(poseStack, consumer, camRelative, boxR, boxG, boxB, lineAlpha);
         }
 
         poseStack.popPose();
@@ -226,11 +247,13 @@ public class StandaloneHighlightRenderer {
             FadedVertexConsumer fadedConsumer = new FadedVertexConsumer(translucentConsumer, 0.45f);
             MultiBufferSource fadedBuffer = type -> fadedConsumer;
             BlockPos originSoilPos = FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) ? clickedPos : clickedPos.below();
+            Block mainCropBlock = FarmingManager.getCropBlock(heldItem);
+            Block offCropBlock = FarmingManager.getCropBlock(offItem);
 
             for (BlockPos pos : previewBlocks) {
                 BlockState stateToRender = ghostPlantState;
                 if (ghostOffState != null) {
-                    boolean isMainRow = FarmingManager.isMainCropRow(pos, originSoilPos, player.getDirection());
+                    boolean isMainRow = FarmingManager.isMainCropRow(level, pos, originSoilPos, player.getDirection(), mainCropBlock, offCropBlock);
                     stateToRender = isMainRow ? ghostPlantState : ghostOffState;
                 }
                 if (stateToRender == null) continue;

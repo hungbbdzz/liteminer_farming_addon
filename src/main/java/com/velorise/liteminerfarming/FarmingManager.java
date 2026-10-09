@@ -37,9 +37,16 @@ import net.minecraft.world.level.block.CaveVines;
 import net.minecraft.world.level.block.CaveVinesBlock;
 import net.minecraft.world.level.block.KelpBlock;
 import net.minecraft.world.level.block.KelpPlantBlock;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.grower.TreeGrower;
@@ -93,6 +100,32 @@ public class FarmingManager {
     public static final TagKey<Block> C_BLOCK_SAPLINGS = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "saplings"));
     public static final TagKey<Item> FORGE_SAPLINGS = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("forge", "saplings"));
     public static final TagKey<Block> FORGE_BLOCK_SAPLINGS = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "saplings"));
+
+    public static final TagKey<Item> C_KNIVES = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "tools/knives"));
+    public static final TagKey<Item> FD_KNIVES = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("farmersdelight", "tools/knives"));
+
+    public static boolean isKnife(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return stack.is(C_KNIVES) || stack.is(FD_KNIVES);
+    }
+
+    public static boolean isCompostable(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return ComposterBlock.COMPOSTABLES.containsKey(stack.getItem());
+    }
+
+    public static boolean isNearWater(LevelReader level, BlockPos pos) {
+        for (BlockPos p : BlockPos.betweenClosed(pos.offset(-4, 0, -4), pos.offset(4, 1, 4))) {
+            if (level.getFluidState(p).is(FluidTags.WATER)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private static final Map<Block, Boolean> SUPPORTED_2X2_CACHE = new ConcurrentHashMap<>();
     private static final Map<Block, Boolean> STRICT_2X2_CACHE = new ConcurrentHashMap<>();
@@ -906,8 +939,13 @@ public class FarmingManager {
                 }
 
                 if (tilled) {
-                    if (tilledCount % 4 == 0) {
-                        level.playSound(null, pos, SoundEvents.HOE_TILL, SoundSource.BLOCKS, 1.0F, 1.0F);
+                    boolean audioCascade = FarmingConfig.SATISFYING_AUDIO_CASCADE.get();
+                    int soundInterval = audioCascade ? 2 : 4;
+                    if (tilledCount % soundInterval == 0) {
+                        float pitch = audioCascade 
+                                ? (0.85F + Math.min(0.40F, (tilledCount / 32.0F) * 0.40F))
+                                : 1.0F;
+                        level.playSound(null, pos, SoundEvents.HOE_TILL, SoundSource.BLOCKS, 1.0F, pitch);
                     }
 
                     tilledCount++;
@@ -930,10 +968,127 @@ public class FarmingManager {
         return false;
     }
 
+    public static Block getCropBlock(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        if (stack.is(Items.SWEET_BERRIES)) {
+            return Blocks.SWEET_BERRY_BUSH;
+        }
+        if (stack.is(Items.NETHER_WART)) {
+            return Blocks.NETHER_WART;
+        }
+        if (stack.is(Items.BAMBOO)) {
+            return Blocks.BAMBOO_SAPLING;
+        }
+        if (stack.getItem() instanceof BlockItem bi) {
+            return bi.getBlock();
+        }
+        return null;
+    }
+
+    public static boolean isMatchingCrop(BlockState state, Block cropBlock) {
+        if (cropBlock == null || state == null || state.isAir()) {
+            return false;
+        }
+        if (state.is(cropBlock)) {
+            return true;
+        }
+        if (cropBlock == Blocks.MELON_STEM && state.is(Blocks.ATTACHED_MELON_STEM)) {
+            return true;
+        }
+        if (cropBlock == Blocks.PUMPKIN_STEM && state.is(Blocks.ATTACHED_PUMPKIN_STEM)) {
+            return true;
+        }
+        return false;
+    }
+
+    private static BlockState findCropAtColumn(Level level, int x, int baseY, int z) {
+        BlockPos p = new BlockPos(x, baseY, z);
+        BlockState s = level.getBlockState(p);
+        if (!s.isAir()) return s;
+        BlockState sUp = level.getBlockState(p.above());
+        if (!sUp.isAir()) return sUp;
+        BlockState sDown = level.getBlockState(p.below());
+        if (!sDown.isAir()) return sDown;
+        return s;
+    }
+
     /**
-     * Determines whether a block position belongs to the primary crop row or alternating crop row
-     * for smart intercropping. Rows run parallel to the player's view direction.
+     * Smart Context-Aware Intercropping:
+     * 1. Line Continuation: Follows the existing path forward/backward if crops are already planted along this line.
+     * 2. Neighbor Avoidance: Checks adjacent parallel rows to avoid planting the same crop next to existing neighbors.
+     * 3. Phased Alignment: Snaps into the parity phase of the closest existing crop in the field.
+     * 4. Default: Alternates parallel rows relative to origin if no existing crops are present.
      */
+    public static boolean isMainCropRow(
+            Level level,
+            BlockPos soilPos,
+            BlockPos originPos,
+            Direction facing,
+            Block mainCropBlock,
+            Block offCropBlock
+    ) {
+        boolean alternateOnX = (facing.getAxis() == Direction.Axis.Z);
+
+        if (mainCropBlock != null && offCropBlock != null && level != null) {
+            int cropY = soilPos.getY() + 1;
+
+            // 1. Line continuation: check along this exact row line (search radius 8)
+            if (alternateOnX) {
+                int x = soilPos.getX();
+                for (int dz = -8; dz <= 8; dz++) {
+                    if (dz == 0) continue;
+                    BlockState s = findCropAtColumn(level, x, cropY, soilPos.getZ() + dz);
+                    if (isMatchingCrop(s, mainCropBlock)) return true;
+                    if (isMatchingCrop(s, offCropBlock)) return false;
+                }
+            } else {
+                int z = soilPos.getZ();
+                for (int dx = -8; dx <= 8; dx++) {
+                    if (dx == 0) continue;
+                    BlockState s = findCropAtColumn(level, soilPos.getX() + dx, cropY, z);
+                    if (isMatchingCrop(s, mainCropBlock)) return true;
+                    if (isMatchingCrop(s, offCropBlock)) return false;
+                }
+            }
+
+            // 2. Neighbor avoidance: find closest crop in adjacent rows to lock in phase
+            int curRow = alternateOnX ? soilPos.getX() : soilPos.getZ();
+            for (int dist = 1; dist <= 12; dist++) {
+                // Check dist rows to the left and right
+                int rowA = curRow - dist;
+                int rowB = curRow + dist;
+
+                for (int offset = -4; offset <= 4; offset++) {
+                    BlockState sA = alternateOnX
+                            ? findCropAtColumn(level, rowA, cropY, soilPos.getZ() + offset)
+                            : findCropAtColumn(level, soilPos.getX() + offset, cropY, rowA);
+                    if (isMatchingCrop(sA, mainCropBlock)) {
+                        return Math.floorMod(dist, 2) == 0;
+                    }
+                    if (isMatchingCrop(sA, offCropBlock)) {
+                        return Math.floorMod(dist, 2) != 0;
+                    }
+
+                    BlockState sB = alternateOnX
+                            ? findCropAtColumn(level, rowB, cropY, soilPos.getZ() + offset)
+                            : findCropAtColumn(level, soilPos.getX() + offset, cropY, rowB);
+                    if (isMatchingCrop(sB, mainCropBlock)) {
+                        return Math.floorMod(dist, 2) == 0;
+                    }
+                    if (isMatchingCrop(sB, offCropBlock)) {
+                        return Math.floorMod(dist, 2) != 0;
+                    }
+                }
+            }
+        }
+
+        // 3. Default alternation if no contextual crops are found in the vicinity
+        int rowCoord = alternateOnX ? (soilPos.getX() - originPos.getX()) : (soilPos.getZ() - originPos.getZ());
+        return Math.floorMod(rowCoord, 2) == 0;
+    }
+
     public static boolean isMainCropRow(BlockPos pos, BlockPos originPos, Direction facing) {
         boolean alternateOnX = (facing.getAxis() == Direction.Axis.Z);
         int rowCoord = alternateOnX ? (pos.getX() - originPos.getX()) : (pos.getZ() - originPos.getZ());
@@ -1000,7 +1155,7 @@ public class FarmingManager {
         Block mainCropBlock = cropBlock;
 
         Item offSeedItem = isIntercropping ? offHandStack.getItem() : null;
-        Block offCropBlock = (offSeedItem instanceof BlockItem bi) ? bi.getBlock() : null;
+        Block offCropBlock = isIntercropping ? getCropBlock(offHandStack) : null;
 
         int plantedCount = 0;
         SoundType cropSound = null;
@@ -1012,7 +1167,7 @@ public class FarmingManager {
 
             boolean useMainCrop = true;
             if (isIntercropping && offCropBlock != null) {
-                useMainCrop = isMainCropRow(soilPos, originSoilPos, facing);
+                useMainCrop = isMainCropRow(level, soilPos, originSoilPos, facing, mainCropBlock, offCropBlock);
             }
 
             Item currentSeedItem = useMainCrop ? mainSeedItem : offSeedItem;
@@ -1043,9 +1198,18 @@ public class FarmingManager {
                         level.gameEvent(player, GameEvent.BLOCK_PLACE, above);
 
                         cropSound = placeState.getSoundType(level, above, player);
-                        if (plantedCount % 4 == 0) {
+                        boolean audioCascade = FarmingConfig.SATISFYING_AUDIO_CASCADE.get();
+                        int soundInterval = audioCascade ? 2 : 4;
+                        if (plantedCount % soundInterval == 0) {
+                            float pitch = audioCascade 
+                                    ? (0.8F + Math.min(0.45F, (plantedCount / 32.0F) * 0.45F))
+                                    : (cropSound.getPitch() * 0.8F);
                             level.playSound(null, above, cropSound.getPlaceSound(), SoundSource.BLOCKS,
-                                    (cropSound.getVolume() + 1.0F) / 2.0F, cropSound.getPitch() * 0.8F);
+                                    (cropSound.getVolume() + 1.0F) / 2.0F, pitch);
+                        }
+
+                        if (audioCascade && level instanceof ServerLevel sl) {
+                            sl.sendParticles(ParticleTypes.HAPPY_VILLAGER, above.getX() + 0.5, above.getY() + 0.2, above.getZ() + 0.5, 1, 0.2, 0.1, 0.2, 0.02);
                         }
 
                         plantedCount++;
@@ -1448,6 +1612,23 @@ public class FarmingManager {
             // Standard crops: calculate drops
             List<ItemStack> drops = new ArrayList<>(Block.getDrops(cropState, serverLevel, cropPos, null, player, heldItem));
 
+            // Farmer's Delight Knife Compatibility: Straw drops
+            if (FarmingConfig.FARMERS_DELIGHT_KNIFE_COMPAT.get() && isKnife(heldItem)) {
+                Item strawItem = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("farmersdelight", "straw"));
+                if (strawItem != null && strawItem != Items.AIR) {
+                    boolean alreadyHasStraw = drops.stream().anyMatch(s -> s.is(strawItem));
+                    if (!alreadyHasStraw) {
+                        int fortune = player.level().registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
+                                .get(Enchantments.FORTUNE)
+                                .map(h -> EnchantmentHelper.getItemEnchantmentLevel(h, heldItem))
+                                .orElse(0);
+                        if (serverLevel.random.nextFloat() < (0.20F + 0.10F * fortune)) {
+                            drops.add(new ItemStack(strawItem));
+                        }
+                    }
+                }
+            }
+
             if (replant) {
                 Item seedItem = cropBlock.asItem();
                 if (seedItem == Items.AIR) {
@@ -1500,9 +1681,18 @@ public class FarmingManager {
                 }
             }
 
-            if (harvestedCount % 4 == 0 && lastSoundType != null) {
+            boolean audioCascade = FarmingConfig.SATISFYING_AUDIO_CASCADE.get();
+            int soundInterval = audioCascade ? 2 : 4;
+            if (harvestedCount % soundInterval == 0 && lastSoundType != null) {
+                float pitch = audioCascade
+                        ? (0.75F + Math.min(0.55F, (harvestedCount / (float) Math.max(1, sorted.size())) * 0.55F))
+                        : (lastSoundType.getPitch() * 0.8F);
                 serverLevel.playSound(null, cropPos, lastSoundType.getBreakSound(), SoundSource.BLOCKS,
-                        (lastSoundType.getVolume() + 1.0F) / 2.0F, lastSoundType.getPitch() * 0.8F);
+                        (lastSoundType.getVolume() + 1.0F) / 2.0F, pitch);
+            }
+
+            if (audioCascade) {
+                serverLevel.sendParticles(ParticleTypes.HAPPY_VILLAGER, cropPos.getX() + 0.5, cropPos.getY() + 0.3, cropPos.getZ() + 0.5, 2, 0.2, 0.1, 0.2, 0.02);
             }
 
             harvestedCount++;
@@ -1530,7 +1720,9 @@ public class FarmingManager {
                 }
             }
 
-            if (lastSoundType != null) {
+            if (FarmingConfig.SATISFYING_AUDIO_CASCADE.get()) {
+                serverLevel.playSound(null, clickedCropPos, SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.45F, 1.25F);
+            } else if (lastSoundType != null) {
                 serverLevel.playSound(null, clickedCropPos, lastSoundType.getBreakSound(), SoundSource.BLOCKS,
                         (lastSoundType.getVolume() + 1.0F) / 2.0F, lastSoundType.getPitch() * 0.8F);
             } else if (originState != null) {
@@ -1552,7 +1744,8 @@ public class FarmingManager {
         if (player.isCreative()) {
             return;
         }
-        if (damageHoe && !heldItem.isEmpty() && FarmingEventHandler.isHoe(heldItem)) {
+        boolean isFarmingTool = FarmingEventHandler.isHoe(heldItem) || (FarmingConfig.FARMERS_DELIGHT_KNIFE_COMPAT.get() && isKnife(heldItem));
+        if (damageHoe && !heldItem.isEmpty() && isFarmingTool) {
             heldItem.hurtAndBreak(1, player, hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
         }
         if (exhaustion > 0) {
@@ -1997,5 +2190,110 @@ public class FarmingManager {
                 return;
             }
         }
+    }
+
+    /**
+     * Batch processes an entire stack (and inventory) of compostables in a Composter in one click.
+     */
+    public static boolean handleBatchCompost(ServerPlayer player, InteractionHand hand, ItemStack heldItem, BlockPos composterPos) {
+        if (!FarmingConfig.BATCH_COMPOSTER.get()) {
+            return false;
+        }
+        Level level = player.level();
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return false;
+        }
+        BlockState state = level.getBlockState(composterPos);
+        if (!state.is(Blocks.COMPOSTER)) {
+            return false;
+        }
+
+        Item compostItem = heldItem.getItem();
+        if (!ComposterBlock.COMPOSTABLES.containsKey(compostItem)) {
+            return false;
+        }
+        float chance = ComposterBlock.COMPOSTABLES.getFloat(compostItem);
+        if (chance <= 0.0F) {
+            return false;
+        }
+
+        int currentLevel = state.getValue(ComposterBlock.LEVEL);
+        int producedBoneMeal = 0;
+
+        // If composter is currently ready (level 8), first harvest that bone meal
+        if (currentLevel >= 8) {
+            producedBoneMeal++;
+            currentLevel = 0;
+        }
+
+        int availableCount = heldItem.getCount();
+        List<ItemStack> invStacksToConsume = new ArrayList<>();
+        if (FarmingConfig.PULL_FROM_INVENTORY.get()) {
+            for (int i = 0; i < player.getInventory().items.size(); i++) {
+                ItemStack s = player.getInventory().items.get(i);
+                if (!s.isEmpty() && s != heldItem && s.is(compostItem)) {
+                    invStacksToConsume.add(s);
+                    availableCount += s.getCount();
+                }
+            }
+        }
+
+        if (availableCount <= 0) {
+            return false;
+        }
+
+        int batchLimit = Math.min(availableCount, 128);
+        int consumed = 0;
+
+        for (int i = 0; i < batchLimit; i++) {
+            consumed++;
+            if (serverLevel.random.nextFloat() < chance) {
+                currentLevel++;
+                if (currentLevel >= 7) {
+                    producedBoneMeal++;
+                    currentLevel = 0;
+                }
+            }
+        }
+
+        if (!player.isCreative()) {
+            int toDeduct = consumed;
+            int handDeduct = Math.min(toDeduct, heldItem.getCount());
+            heldItem.shrink(handDeduct);
+            toDeduct -= handDeduct;
+
+            for (ItemStack invStack : invStacksToConsume) {
+                if (toDeduct <= 0) break;
+                int deduct = Math.min(toDeduct, invStack.getCount());
+                invStack.shrink(deduct);
+                toDeduct -= deduct;
+            }
+        }
+
+        BlockState newState = state.setValue(ComposterBlock.LEVEL, currentLevel);
+        serverLevel.setBlock(composterPos, newState, 3);
+        serverLevel.gameEvent(player, GameEvent.BLOCK_CHANGE, composterPos);
+
+        if (producedBoneMeal > 0) {
+            ItemStack boneMealStack = new ItemStack(Items.BONE_MEAL, producedBoneMeal);
+            boolean harvestToInv = FarmingConfig.HARVEST_TO_INVENTORY.get();
+            if (harvestToInv) {
+                boolean added = player.getInventory().add(boneMealStack);
+                if (!added || !boneMealStack.isEmpty()) {
+                    Block.popResource(serverLevel, composterPos.above(), boneMealStack);
+                }
+                player.containerMenu.broadcastChanges();
+            } else {
+                Block.popResource(serverLevel, composterPos.above(), boneMealStack);
+            }
+            serverLevel.playSound(null, composterPos, SoundEvents.COMPOSTER_EMPTY, SoundSource.BLOCKS, 1.0F, 1.0F);
+        } else {
+            serverLevel.playSound(null, composterPos, SoundEvents.COMPOSTER_FILL_SUCCESS, SoundSource.BLOCKS, 1.0F, 1.0F);
+        }
+
+        serverLevel.sendParticles(ParticleTypes.COMPOSTER, composterPos.getX() + 0.5, composterPos.getY() + 0.8, composterPos.getZ() + 0.5, 12, 0.25, 0.2, 0.25, 0.05);
+
+        player.swing(hand, true);
+        return true;
     }
 }

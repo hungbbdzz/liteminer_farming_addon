@@ -26,6 +26,10 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue GHOST_PLANT_PREVIEW;
     public static final ModConfigSpec.BooleanValue HARVEST_TO_INVENTORY;
     public static final ModConfigSpec.BooleanValue SMART_INTERCROPPING;
+    public static final ModConfigSpec.BooleanValue SATISFYING_AUDIO_CASCADE;
+    public static final ModConfigSpec.BooleanValue SMART_IRRIGATION_PREVIEW;
+    public static final ModConfigSpec.BooleanValue BATCH_COMPOSTER;
+    public static final ModConfigSpec.BooleanValue FARMERS_DELIGHT_KNIFE_COMPAT;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -119,6 +123,22 @@ public class FarmingConfig {
         SMART_INTERCROPPING = builder
                 .comment("When holding different crop seeds in both hands, automatically plant them in alternating parallel rows for optimal vanilla growth speed.")
                 .define("smart_intercropping", true);
+
+        SATISFYING_AUDIO_CASCADE = builder
+                .comment("Play a musical ascending audio pitch cascade and sparkle particles during mass harvest and planting.")
+                .define("satisfying_audio_cascade", true);
+
+        SMART_IRRIGATION_PREVIEW = builder
+                .comment("In hoe preview, distinguish unhydrated farmland that lacks water with an amber warning, and show optimal 9x9 water well locations.")
+                .define("smart_irrigation_preview", true);
+
+        BATCH_COMPOSTER = builder
+                .comment("Holding Sneak and right-clicking a Composter with seeds or compostables instantly processes the entire stack into Bone Meal in one click.")
+                .define("batch_composter", true);
+
+        FARMERS_DELIGHT_KNIFE_COMPAT = builder
+                .comment("Allow Farmer's Delight / modded knives to harvest crops in an AOE, damaging the knife and dropping Straw.")
+                .define("farmers_delight_knife_compat", true);
 
         builder.pop();
         SPEC = builder.build();
