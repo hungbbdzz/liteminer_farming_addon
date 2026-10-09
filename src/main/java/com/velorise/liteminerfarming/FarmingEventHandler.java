@@ -99,12 +99,26 @@ public class FarmingEventHandler {
             return;
         }
 
-        // 3. Bone Meal Interaction (AOE Fertilizing)
+        // 3. Bone Meal Interaction (AOE Fertilizing, with fallback to harvesting if all crops are mature)
         if (heldItem.is(Items.BONE_MEAL)) {
             boolean handled = FarmingManager.handleMassBoneMeal(serverPlayer, hand, heldItem, clickedPos);
             if (handled) {
                 event.setCancellationResult(InteractionResult.SUCCESS);
                 event.setCanceled(true);
+                return;
+            }
+
+            // If bone meal could not fertilize anything (i.e. all crops in the area are already fully mature),
+            // automatically harvest and replant them!
+            boolean isDirectCrop = FarmingManager.isMatureCrop(clickedState);
+            boolean isFarmlandWithCrop = FarmingManager.isFarmland(clickedState) && FarmingManager.isMatureCrop(level.getBlockState(clickedPos.above()));
+            if (isDirectCrop || isFarmlandWithCrop) {
+                BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
+                boolean harvestHandled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
+                if (harvestHandled) {
+                    event.setCancellationResult(InteractionResult.SUCCESS);
+                    event.setCanceled(true);
+                }
             }
             return;
         }
