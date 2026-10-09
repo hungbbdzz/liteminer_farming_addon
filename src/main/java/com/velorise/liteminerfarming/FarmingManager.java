@@ -51,22 +51,29 @@ import java.util.*;
 public class FarmingManager {
 
     /**
-     * Checks if an item stack represents a plantable crop/seed on farmland.
+     * Universal check if an item stack is a plantable crop/seed.
      */
-    public static boolean isPlantableCrop(ItemStack stack) {
+    public static boolean isPlantableSeed(ItemStack stack) {
         if (stack.isEmpty()) {
             return false;
+        }
+        if (stack.is(Items.NETHER_WART)) {
+            return true;
         }
         Item item = stack.getItem();
         if (item instanceof BlockItem blockItem) {
             Block block = blockItem.getBlock();
-            return block instanceof BushBlock;
+            return block instanceof BushBlock || block instanceof CropBlock;
         }
         return false;
     }
 
+    public static boolean isPlantableCrop(ItemStack stack) {
+        return isPlantableSeed(stack);
+    }
+
     /**
-     * Universal farmland check supporting vanilla and modded farmlands (e.g. Farmer's Delight Rich Soil Farmland).
+     * Universal farmland check supporting vanilla and modded farmlands.
      */
     public static boolean isFarmland(BlockState state) {
         if (state == null) {
@@ -80,10 +87,62 @@ public class FarmingManager {
     }
 
     /**
+     * Universal Soul Sand check for Nether Wart planting.
+     */
+    public static boolean isSoulSand(BlockState state) {
+        if (state == null) {
+            return false;
+        }
+        return state.is(Blocks.SOUL_SAND) || state.is(BlockTags.SOUL_SPEED_BLOCKS);
+    }
+
+    /**
+     * Universal soil check for any seed.
+     */
+    public static boolean isValidSoilForSeed(ItemStack seedStack, BlockState soilState, Level level, BlockPos soilPos) {
+        if (seedStack.isEmpty() || soilState == null) {
+            return false;
+        }
+        if (seedStack.is(Items.NETHER_WART)) {
+            return isSoulSand(soilState);
+        }
+        if (isFarmland(soilState)) {
+            return true;
+        }
+        Item item = seedStack.getItem();
+        if (item instanceof BlockItem blockItem) {
+            Block block = blockItem.getBlock();
+            BlockPos plantPos = soilPos.above();
+            return block.defaultBlockState().canSurvive(level, plantPos);
+        }
+        return false;
+    }
+
+    /**
+     * Filters Bonemealable targets to actual crops/plants (strictly EXCLUDES wild grass blocks).
+     */
+    public static boolean isBonemealCrop(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        if (state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.TALL_GRASS) || state.is(Blocks.FERN)
+                || state.is(Blocks.LARGE_FERN) || state.is(Blocks.SHORT_GRASS)) {
+            return false;
+        }
+        return state.getBlock() instanceof BonemealableBlock;
+    }
+
+    /**
      * Universal check for mature crops supporting vanilla and modded crops.
+     * Stems (melon/pumpkin stems) are NEVER considered mature crops to harvest!
      */
     public static boolean isMatureCrop(BlockState state) {
         if (state == null || state.isAir()) {
+            return false;
+        }
+
+        // Fruit stems are NEVER harvested!
+        if (isStem(state)) {
             return false;
         }
 
@@ -94,28 +153,38 @@ public class FarmingManager {
             return cropBlock.isMaxAge(state);
         }
 
-        // 2. Nether Wart
+        // 2. Pitcher Crop (2 blocks tall, max age 4)
+        if (state.is(Blocks.PITCHER_CROP)) {
+            for (Property<?> prop : state.getProperties()) {
+                if (prop instanceof IntegerProperty intProp && intProp.getName().equalsIgnoreCase("age")) {
+                    return state.getValue(intProp) >= 4;
+                }
+            }
+        }
+
+        // 3. Nether Wart
         if (block instanceof NetherWartBlock) {
             return state.getValue(NetherWartBlock.AGE) >= 3;
         }
 
-        // 3. Cocoa
+        // 4. Cocoa
         if (block instanceof CocoaBlock) {
             return state.getValue(CocoaBlock.AGE) >= 2;
         }
 
-        // 4. Sweet Berry Bush
+        // 5. Sweet Berry Bush
         if (block instanceof SweetBerryBushBlock) {
             return state.getValue(SweetBerryBushBlock.AGE) >= 2;
         }
 
-        // 5. Cave Vines (Glow Berries)
+        // 6. Cave Vines (Glow Berries)
         if (block instanceof CaveVines || state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT)) {
             return CaveVines.hasGlowBerries(state);
         }
 
-        // 6. Generic check for any BushBlock with an "age" integer property (Farmer's Delight tomato/rice, etc.)
-        if (block instanceof BushBlock) {
+        // 7. Generic check for any BushBlock with an "age" integer property (Farmer's Delight tomato/rice, etc.)
+        // But NOT StemBlock or AttachedStemBlock!
+        if (block instanceof BushBlock && !(block instanceof StemBlock) && !(block instanceof AttachedStemBlock)) {
             for (Property<?> prop : state.getProperties()) {
                 if (prop instanceof IntegerProperty intProp && intProp.getName().equalsIgnoreCase("age")) {
                     int currentAge = state.getValue(intProp);
@@ -132,16 +201,21 @@ public class FarmingManager {
 
     /**
      * Universal check for any crop (mature or immature).
+     * Excludes fruit stems so stems are never treated as harvest targets.
      */
     public static boolean isCrop(BlockState state) {
         if (state == null || state.isAir()) {
             return false;
         }
-        if (isMatureCrop(state) || isColumnCrop(state) || isFruitCrop(state) || isStem(state)) {
+        if (isMatureCrop(state) || isColumnCrop(state) || isFruitCrop(state)) {
             return true;
+        }
+        if (isStem(state)) {
+            return false;
         }
         Block block = state.getBlock();
         if (block instanceof CropBlock
+                || state.is(Blocks.PITCHER_CROP)
                 || block instanceof NetherWartBlock
                 || block instanceof CocoaBlock
                 || block instanceof SweetBerryBushBlock
@@ -153,7 +227,7 @@ public class FarmingManager {
         if (state.is(BlockTags.CROPS)) {
             return true;
         }
-        if (block instanceof BushBlock) {
+        if (block instanceof BushBlock && !(block instanceof StemBlock) && !(block instanceof AttachedStemBlock)) {
             for (Property<?> prop : state.getProperties()) {
                 if (prop instanceof IntegerProperty intProp && intProp.getName().equalsIgnoreCase("age")) {
                     return true;
@@ -302,12 +376,61 @@ public class FarmingManager {
     }
 
     /**
-     * Handles mass tilling using positions strictly defined by LiteMiner's Walker.
+     * Retrieves selected positions from LiteMiner or FTB Ultimine if active, or empty list.
+     */
+    public static Collection<BlockPos> getSelectedPositions(ServerPlayer player, BlockPos pos) {
+        if (LiteMinerCompat.isLiteMinerLoaded() && LiteMinerCompat.isLiteMinerActive(player)) {
+            Collection<BlockPos> lm = LiteMinerCompat.getSelectedBlocks(player, pos);
+            if (lm != null && !lm.isEmpty()) {
+                return lm;
+            }
+        }
+        if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+            Collection<BlockPos> ftb = FTBUltimineCompat.getSelectedBlocks(player, pos);
+            if (ftb != null && !ftb.isEmpty()) {
+                return ftb;
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    public static int getEffectiveBlockLimit(ServerPlayer player) {
+        if (LiteMinerCompat.isLiteMinerLoaded() && LiteMinerCompat.isLiteMinerActive(player)) {
+            return LiteMinerCompat.getEffectiveBlockLimit();
+        }
+        if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+            return FTBUltimineCompat.getEffectiveBlockLimit(player);
+        }
+        return FarmingConfig.MAX_BLOCKS.get();
+    }
+
+    public static boolean shouldPreventToolBreaking(ServerPlayer player) {
+        if (LiteMinerCompat.isLiteMinerLoaded() && LiteMinerCompat.isLiteMinerActive(player)) {
+            return LiteMinerCompat.shouldPreventToolBreaking();
+        }
+        if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+            return FTBUltimineCompat.shouldPreventToolBreaking();
+        }
+        return FarmingConfig.PREVENT_TOOL_BREAKING.get();
+    }
+
+    public static float getFoodExhaustion(ServerPlayer player) {
+        if (LiteMinerCompat.isLiteMinerLoaded() && LiteMinerCompat.isLiteMinerActive(player)) {
+            return LiteMinerCompat.getFoodExhaustion();
+        }
+        if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+            return FTBUltimineCompat.getFoodExhaustion(player);
+        }
+        return FarmingConfig.EXHAUSTION_PER_BLOCK.get().floatValue();
+    }
+
+    /**
+     * Handles mass tilling using positions defined by LiteMiner, FTB Ultimine, or standalone BFS.
      */
     public static boolean handleMassHoe(ServerPlayer player, InteractionHand hand, ItemStack hoeStack, BlockPos clickedPos) {
         Level level = player.level();
 
-        Collection<BlockPos> selected = LiteMinerCompat.getSelectedBlocks(player, clickedPos);
+        Collection<BlockPos> selected = getSelectedPositions(player, clickedPos);
         if (selected == null || selected.isEmpty()) {
             selected = fallbackHoeSearch(player, hand, clickedPos);
         }
@@ -320,10 +443,10 @@ public class FarmingManager {
                 .sorted(Comparator.comparingInt(p -> p.distManhattan(clickedPos)))
                 .toList();
 
-        int maxLimit = LiteMinerCompat.getEffectiveBlockLimit();
-        boolean preventBreaking = LiteMinerCompat.shouldPreventToolBreaking();
+        int maxLimit = getEffectiveBlockLimit(player);
+        boolean preventBreaking = shouldPreventToolBreaking(player);
         boolean clearFoliage = FarmingConfig.CLEAR_FOLIAGE.get();
-        float exhaustion = LiteMinerCompat.getFoodExhaustion();
+        float exhaustion = getFoodExhaustion(player);
 
         int tilledCount = 0;
 
@@ -405,6 +528,9 @@ public class FarmingManager {
         if (tilledCount > 0) {
             level.playSound(null, clickedPos, SoundEvents.HOE_TILL, SoundSource.BLOCKS, 1.0F, 1.0F);
             player.swing(hand, true);
+            if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+                FTBUltimineCompat.applyPostUltimineCosts(player, tilledCount);
+            }
             return true;
         }
 
@@ -422,56 +548,55 @@ public class FarmingManager {
         }
 
         Block cropBlock = blockItem.getBlock();
-        if (!(cropBlock instanceof BushBlock)) {
-            return false;
-        }
 
-        // Determine starting farmland pos
-        BlockPos startFarmPos = clickedPos;
+        // Determine starting soil pos
+        BlockPos startSoilPos = clickedPos;
         BlockState clickedState = level.getBlockState(clickedPos);
-        if (!isFarmland(clickedState)) {
-            if (isFarmland(level.getBlockState(clickedPos.below()))) {
-                startFarmPos = clickedPos.below();
+        if (!isValidSoilForSeed(seedStack, clickedState, level, clickedPos)) {
+            if (isValidSoilForSeed(seedStack, level.getBlockState(clickedPos.below()), level, clickedPos.below())) {
+                startSoilPos = clickedPos.below();
+                clickedState = level.getBlockState(startSoilPos);
             } else {
                 return false;
             }
         }
 
-        Collection<BlockPos> selected = LiteMinerCompat.getSelectedBlocks(player, startFarmPos);
+        Collection<BlockPos> selected = getSelectedPositions(player, startSoilPos);
         if (selected == null || selected.isEmpty()) {
-            selected = fallbackPlantingSearch(level, startFarmPos);
+            selected = fallbackPlantingSearch(level, startSoilPos, seedStack);
         }
 
         if (selected == null || selected.isEmpty()) {
             return false;
         }
 
-        final BlockPos originFarmPos = startFarmPos;
+        final BlockPos originSoilPos = startSoilPos;
         List<BlockPos> sorted = selected.stream()
-                .sorted(Comparator.comparingInt(p -> p.distManhattan(originFarmPos)))
+                .sorted(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)))
                 .toList();
 
-        int maxLimit = LiteMinerCompat.getEffectiveBlockLimit();
-        float exhaustion = LiteMinerCompat.getFoodExhaustion();
+        int maxLimit = getEffectiveBlockLimit(player);
+        float exhaustion = getFoodExhaustion(player);
 
         int plantedCount = 0;
         SoundType cropSound = null;
 
-        for (BlockPos farmPos : sorted) {
+        for (BlockPos soilPos : sorted) {
             if (plantedCount >= maxLimit) {
                 break;
             }
 
-            if (!isFarmland(level.getBlockState(farmPos))) {
+            BlockState soilState = level.getBlockState(soilPos);
+            if (!isValidSoilForSeed(seedStack, soilState, level, soilPos)) {
                 continue;
             }
 
-            BlockPos above = farmPos.above();
+            BlockPos above = soilPos.above();
             BlockState aboveState = level.getBlockState(above);
 
-            if (aboveState.isAir()) {
+            if (aboveState.isAir() || aboveState.canBeReplaced()) {
                 BlockPlaceContext placeContext = new BlockPlaceContext(new UseOnContext(
-                        player, hand, new BlockHitResult(Vec3.atCenterOf(above), Direction.UP, farmPos, false)
+                        player, hand, new BlockHitResult(Vec3.atCenterOf(above), Direction.UP, soilPos, false)
                 ));
                 BlockState placeState = cropBlock.getStateForPlacement(placeContext);
                 if (placeState == null) {
@@ -503,10 +628,13 @@ public class FarmingManager {
 
         if (plantedCount > 0) {
             if (cropSound != null) {
-                level.playSound(null, startFarmPos.above(), cropSound.getPlaceSound(), SoundSource.BLOCKS,
+                level.playSound(null, startSoilPos.above(), cropSound.getPlaceSound(), SoundSource.BLOCKS,
                         (cropSound.getVolume() + 1.0F) / 2.0F, cropSound.getPitch() * 0.8F);
             }
             player.swing(hand, true);
+            if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+                FTBUltimineCompat.applyPostUltimineCosts(player, plantedCount);
+            }
             return true;
         }
 
@@ -526,9 +654,9 @@ public class FarmingManager {
             targetCropPos = clickedPos.above();
         }
 
-        Collection<BlockPos> selected = LiteMinerCompat.getSelectedBlocks(player, targetCropPos);
+        Collection<BlockPos> selected = getSelectedPositions(player, targetCropPos);
         if (selected == null || selected.isEmpty()) {
-            selected = LiteMinerCompat.getSelectedBlocks(player, targetCropPos.below());
+            selected = getSelectedPositions(player, targetCropPos.below());
         }
 
         if (selected == null || selected.isEmpty()) {
@@ -544,8 +672,8 @@ public class FarmingManager {
                 .sorted(Comparator.comparingInt(p -> p.distManhattan(originPos)))
                 .toList();
 
-        int maxLimit = LiteMinerCompat.getEffectiveBlockLimit();
-        float exhaustion = LiteMinerCompat.getFoodExhaustion();
+        int maxLimit = getEffectiveBlockLimit(player);
+        float exhaustion = getFoodExhaustion(player);
         boolean smartBonemeal = FarmingConfig.SMART_BONEMEAL.get();
 
         int fertilizedCount = 0;
@@ -568,8 +696,8 @@ public class FarmingManager {
 
                 BlockPos cropPos = pos;
                 BlockState state = level.getBlockState(cropPos);
-                if (!(state.getBlock() instanceof BonemealableBlock)) {
-                    if (level.getBlockState(pos.above()).getBlock() instanceof BonemealableBlock) {
+                if (!isBonemealCrop(state)) {
+                    if (isBonemealCrop(level.getBlockState(pos.above()))) {
                         cropPos = pos.above();
                         state = level.getBlockState(cropPos);
                     } else {
@@ -613,6 +741,9 @@ public class FarmingManager {
 
         if (fertilizedCount > 0) {
             player.swing(hand, true);
+            if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+                FTBUltimineCompat.applyPostUltimineCosts(player, fertilizedCount);
+            }
             return true;
         }
 
@@ -632,12 +763,12 @@ public class FarmingManager {
             return false;
         }
 
-        Collection<BlockPos> selected = LiteMinerCompat.getSelectedBlocks(player, clickedCropPos);
+        Collection<BlockPos> selected = getSelectedPositions(player, clickedCropPos);
         if (selected == null || selected.isEmpty()) {
-            selected = LiteMinerCompat.getSelectedBlocks(player, clickedCropPos.below());
+            selected = getSelectedPositions(player, clickedCropPos.below());
         }
         if (selected == null || selected.isEmpty()) {
-            selected = LiteMinerCompat.getSelectedBlocks(player, clickedCropPos.above());
+            selected = getSelectedPositions(player, clickedCropPos.above());
         }
 
         if (selected == null || selected.isEmpty()) {
@@ -653,13 +784,13 @@ public class FarmingManager {
                 .sorted(Comparator.comparingInt(p -> p.distManhattan(originPos)))
                 .toList();
 
-        int maxLimit = LiteMinerCompat.getEffectiveBlockLimit();
-        boolean preventBreaking = LiteMinerCompat.shouldPreventToolBreaking();
+        int maxLimit = getEffectiveBlockLimit(player);
+        boolean preventBreaking = shouldPreventToolBreaking(player);
         boolean replant = FarmingConfig.REPLANT_CROPS.get();
         boolean damageHoe = FarmingConfig.DAMAGE_HOE_ON_HARVEST.get();
         boolean collectAtTarget = FarmingConfig.COLLECT_DROPS_AT_TARGET.get();
         boolean allowColumnCrops = FarmingConfig.HARVEST_SUGAR_CANE.get();
-        float exhaustion = LiteMinerCompat.getFoodExhaustion();
+        float exhaustion = getFoodExhaustion(player);
 
         int harvestedCount = 0;
         SoundType lastSoundType = null;
@@ -755,31 +886,73 @@ public class FarmingManager {
                 applyHarvestCosts(player, hand, heldItem, damageHoe, exhaustion);
                 continue;
             } else if (isStem(curState)) {
-                // Protect stem! Check horizontal neighbors for ripe melon/pumpkin
-                for (Direction dir : Direction.Plane.HORIZONTAL) {
-                    BlockPos fruitNeighbor = pos.relative(dir);
-                    BlockState neighborState = serverLevel.getBlockState(fruitNeighbor);
-                    if (isFruitCrop(neighborState)) {
-                        lastSoundType = neighborState.getSoundType(serverLevel, fruitNeighbor, player);
-                        List<ItemStack> fruitDrops = new ArrayList<>(Block.getDrops(neighborState, serverLevel, fruitNeighbor, null, player, heldItem));
-                        if (collectAtTarget) {
-                            allDrops.addAll(fruitDrops);
-                        } else {
-                            for (ItemStack drop : fruitDrops) {
-                                if (!drop.isEmpty()) {
-                                    Block.popResource(serverLevel, fruitNeighbor, drop);
-                                }
-                            }
-                        }
-                        serverLevel.destroyBlock(fruitNeighbor, false, player);
-                        harvestedCount++;
-                        applyHarvestCosts(player, hand, heldItem, damageHoe, exhaustion);
-                    }
-                }
+                // 100% Protect stem: never harvest, never break, never reset!
                 continue;
             }
 
-            // 3. Standard crop / Sweet Berry Bush / Cave Vines handling
+            // 3. Pitcher Crop (2 blocks tall)
+            if (curState.is(Blocks.PITCHER_CROP) || serverLevel.getBlockState(pos.above()).is(Blocks.PITCHER_CROP)) {
+                BlockPos pPos = curState.is(Blocks.PITCHER_CROP) ? pos : pos.above();
+                BlockState pState = serverLevel.getBlockState(pPos);
+                if (isMatureCrop(pState)) {
+                    BlockPos lowerPos = pPos;
+                    for (Property<?> prop : pState.getProperties()) {
+                        if (prop.getName().equalsIgnoreCase("half") && pState.getValue(prop).toString().equalsIgnoreCase("upper")) {
+                            lowerPos = pPos.below();
+                            break;
+                        }
+                    }
+                    BlockPos upperPos = lowerPos.above();
+                    BlockState lowerState = serverLevel.getBlockState(lowerPos);
+                    List<ItemStack> pitcherDrops = new ArrayList<>(Block.getDrops(lowerState, serverLevel, lowerPos, null, player, heldItem));
+
+                    boolean canReplant = player.isCreative();
+                    Item seedItem = Items.PITCHER_POD;
+                    if (!canReplant && replant) {
+                        for (Iterator<ItemStack> it = pitcherDrops.iterator(); it.hasNext(); ) {
+                            ItemStack drop = it.next();
+                            if (!drop.isEmpty() && drop.is(seedItem)) {
+                                drop.shrink(1);
+                                if (drop.isEmpty()) it.remove();
+                                canReplant = true;
+                                break;
+                            }
+                        }
+                        if (!canReplant && FarmingConfig.PULL_FROM_INVENTORY.get()) {
+                            canReplant = consumeSeed(player, hand, seedItem);
+                        }
+                    }
+
+                    if (canReplant && replant) {
+                        if (serverLevel.getBlockState(upperPos).is(Blocks.PITCHER_CROP)) {
+                            serverLevel.setBlock(upperPos, Blocks.AIR.defaultBlockState(), 3);
+                        }
+                        serverLevel.setBlock(lowerPos, Blocks.PITCHER_CROP.defaultBlockState(), 3);
+                        serverLevel.gameEvent(player, GameEvent.BLOCK_CHANGE, lowerPos);
+                    } else {
+                        serverLevel.destroyBlock(lowerPos, false, player);
+                        if (serverLevel.getBlockState(upperPos).is(Blocks.PITCHER_CROP)) {
+                            serverLevel.destroyBlock(upperPos, false, player);
+                        }
+                    }
+
+                    if (collectAtTarget) {
+                        allDrops.addAll(pitcherDrops);
+                    } else {
+                        for (ItemStack drop : pitcherDrops) {
+                            if (!drop.isEmpty()) {
+                                Block.popResource(serverLevel, lowerPos, drop);
+                            }
+                        }
+                    }
+                    serverLevel.playSound(null, lowerPos, SoundEvents.CROP_BREAK, SoundSource.BLOCKS, 1.0F, 1.0F);
+                    harvestedCount++;
+                    applyHarvestCosts(player, hand, heldItem, damageHoe, exhaustion);
+                    continue;
+                }
+            }
+
+            // 4. Standard crop / Sweet Berry Bush / Cave Vines handling
             BlockPos cropPos = pos;
             BlockState cropState = serverLevel.getBlockState(cropPos);
 
@@ -920,6 +1093,9 @@ public class FarmingManager {
                         (st.getVolume() + 1.0F) / 2.0F, st.getPitch() * 0.8F);
             }
             player.swing(hand, true);
+            if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+                FTBUltimineCompat.applyPostUltimineCosts(player, harvestedCount);
+            }
             return true;
         }
 
@@ -945,36 +1121,149 @@ public class FarmingManager {
         Set<BlockPos> visited = new HashSet<>();
         List<BlockPos> result = new ArrayList<>();
 
-        queue.add(startPos);
-        visited.add(startPos);
+        BlockState startState = level.getBlockState(startPos);
+        BlockPos actualCropPos = startPos;
+        if (isFarmland(startState) || isSoulSand(startState)) {
+            actualCropPos = startPos.above();
+            startState = level.getBlockState(actualCropPos);
+        }
 
-        while (!queue.isEmpty() && result.size() < maxLimit) {
-            BlockPos current = queue.poll();
-            result.add(current);
+        boolean targetColumn = isColumnCrop(startState);
+        boolean targetFruit = isFruitCrop(startState);
+        boolean targetBerry = startState.getBlock() instanceof SweetBerryBushBlock;
+        boolean targetVines = startState.getBlock() instanceof CaveVines || startState.is(Blocks.CAVE_VINES) || startState.is(Blocks.CAVE_VINES_PLANT);
+        boolean targetCocoa = startState.getBlock() instanceof CocoaBlock;
+        boolean targetNetherWart = startState.getBlock() instanceof NetherWartBlock;
 
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dz == 0) continue;
+        // If column crop, normalize root and traverse horizontally across adjacent column roots
+        if (targetColumn) {
+            BlockPos startRoot = getColumnCropRoot(level, actualCropPos);
+            queue.add(startRoot);
+            visited.add(startRoot);
+
+            while (!queue.isEmpty() && result.size() < maxLimit) {
+                BlockPos currentRoot = queue.poll();
+
+                // Add stalks strictly ABOVE currentRoot to result (protecting root)
+                BlockPos stalk = currentRoot.above();
+                BlockState rootState = level.getBlockState(currentRoot);
+                while (isSameColumnType(rootState, level.getBlockState(stalk))) {
+                    if (result.size() >= maxLimit) break;
+                    result.add(stalk);
+                    stalk = stalk.above();
+                }
+
+                // Check horizontal adjacent columns
+                for (Direction dir : Direction.Plane.HORIZONTAL) {
                     for (int dy = -1; dy <= 1; dy++) {
-                        BlockPos next = current.offset(dx, dy, dz);
-                        if (visited.contains(next)) continue;
-                        if (Math.abs(next.getX() - startPos.getX()) > radius
-                                || Math.abs(next.getZ() - startPos.getZ()) > radius
-                                || Math.abs(next.getY() - startPos.getY()) > 3) {
+                        BlockPos neighborPos = currentRoot.relative(dir).above(dy);
+                        if (visited.contains(neighborPos)) continue;
+                        if (Math.abs(neighborPos.getX() - startRoot.getX()) > radius
+                                || Math.abs(neighborPos.getZ() - startRoot.getZ()) > radius
+                                || Math.abs(neighborPos.getY() - startRoot.getY()) > 3) {
                             continue;
                         }
 
-                        BlockState nextState = level.getBlockState(next);
-                        if (isCrop(nextState) || isFarmland(nextState) || isCrop(level.getBlockState(next.above()))
-                                || isColumnCrop(nextState) || isColumnCrop(level.getBlockState(next.above()))
-                                || isFruitCrop(nextState) || isStem(nextState)) {
-                            visited.add(next);
-                            queue.add(next);
+                        BlockState neighborState = level.getBlockState(neighborPos);
+                        if (isSameColumnType(startState, neighborState)) {
+                            BlockPos neighborRoot = getColumnCropRoot(level, neighborPos);
+                            if (!visited.contains(neighborRoot)) {
+                                visited.add(neighborRoot);
+                                queue.add(neighborRoot);
+                            }
                         }
                     }
                 }
             }
+            return result;
         }
+
+        // For all other crops: BFS directly on contiguous harvestable targets
+        queue.add(actualCropPos);
+        visited.add(actualCropPos);
+
+        while (!queue.isEmpty() && result.size() < maxLimit) {
+            BlockPos current = queue.poll();
+
+            BlockState curState = level.getBlockState(current);
+            if (targetFruit) {
+                if (isFruitCrop(curState)) {
+                    result.add(current);
+                }
+            } else if (targetBerry) {
+                if (curState.getBlock() instanceof SweetBerryBushBlock && isMatureCrop(curState)) {
+                    result.add(current);
+                }
+            } else if (targetVines) {
+                if ((curState.getBlock() instanceof CaveVines || curState.is(Blocks.CAVE_VINES) || curState.is(Blocks.CAVE_VINES_PLANT)) && CaveVines.hasGlowBerries(curState)) {
+                    result.add(current);
+                }
+            } else if (targetCocoa) {
+                if (curState.getBlock() instanceof CocoaBlock && isMatureCrop(curState)) {
+                    result.add(current);
+                }
+            } else if (targetNetherWart) {
+                if (curState.getBlock() instanceof NetherWartBlock && isMatureCrop(curState)) {
+                    result.add(current);
+                }
+            } else {
+                // Pitcher Crop or standard Farmland crops
+                if (curState.is(Blocks.PITCHER_CROP) && isMatureCrop(curState)) {
+                    result.add(current);
+                } else if (isMatureCrop(curState) && !isStem(curState)) {
+                    result.add(current);
+                }
+            }
+
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    BlockPos next = current.relative(dir).above(dy);
+                    if (visited.contains(next)) continue;
+                    if (Math.abs(next.getX() - actualCropPos.getX()) > radius
+                            || Math.abs(next.getZ() - actualCropPos.getZ()) > radius
+                            || Math.abs(next.getY() - actualCropPos.getY()) > 2) {
+                        continue;
+                    }
+
+                    BlockState nextState = level.getBlockState(next);
+                    boolean canTraverse = false;
+
+                    if (targetFruit) {
+                        // Only traverse connected fruits of the same type! Never traverse stems!
+                        if (nextState.is(startState.getBlock())) {
+                            canTraverse = true;
+                        }
+                    } else if (targetBerry) {
+                        if (nextState.getBlock() instanceof SweetBerryBushBlock) {
+                            canTraverse = true;
+                        }
+                    } else if (targetVines) {
+                        if (nextState.getBlock() instanceof CaveVines || nextState.is(Blocks.CAVE_VINES) || nextState.is(Blocks.CAVE_VINES_PLANT)) {
+                            canTraverse = true;
+                        }
+                    } else if (targetCocoa) {
+                        if (nextState.getBlock() instanceof CocoaBlock) {
+                            canTraverse = true;
+                        }
+                    } else if (targetNetherWart) {
+                        if (nextState.getBlock() instanceof NetherWartBlock || isSoulSand(nextState)) {
+                            canTraverse = true;
+                        }
+                    } else {
+                        // Farmland crops: traverse connected Farmland or connected crops on farmland
+                        if (isFarmland(nextState) || (isCrop(nextState) && !isStem(nextState))) {
+                            canTraverse = true;
+                        }
+                    }
+
+                    if (canTraverse) {
+                        visited.add(next);
+                        queue.add(next);
+                    }
+                }
+            }
+        }
+
         return result;
     }
 
@@ -985,30 +1274,57 @@ public class FarmingManager {
         Set<BlockPos> visited = new HashSet<>();
         List<BlockPos> result = new ArrayList<>();
 
-        queue.add(startPos);
-        visited.add(startPos);
+        BlockState startState = level.getBlockState(startPos);
+        BlockPos actualTargetPos = startPos;
+        if (isFarmland(startState)) {
+            actualTargetPos = startPos.above();
+            startState = level.getBlockState(actualTargetPos);
+        }
+
+        // Strictly do not bonemeal wild grass blocks!
+        if (startState.is(Blocks.GRASS_BLOCK)) {
+            return Collections.emptyList();
+        }
+
+        queue.add(actualTargetPos);
+        visited.add(actualTargetPos);
 
         while (!queue.isEmpty() && result.size() < maxLimit) {
             BlockPos current = queue.poll();
-            result.add(current);
 
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dz == 0) continue;
-                    for (int dy = -1; dy <= 1; dy++) {
-                        BlockPos next = current.offset(dx, dy, dz);
-                        if (visited.contains(next)) continue;
-                        if (Math.abs(next.getX() - startPos.getX()) > radius
-                                || Math.abs(next.getZ() - startPos.getZ()) > radius
-                                || Math.abs(next.getY() - startPos.getY()) > 2) {
-                            continue;
-                        }
+            BlockState curState = level.getBlockState(current);
+            BlockPos candidateCrop = current;
+            BlockState candidateState = curState;
+            if (!isBonemealCrop(candidateState) && isFarmland(candidateState)) {
+                candidateCrop = current.above();
+                candidateState = level.getBlockState(candidateCrop);
+            }
 
-                        BlockState nextState = level.getBlockState(next);
-                        if (nextState.getBlock() instanceof BonemealableBlock || isFarmland(nextState)) {
-                            visited.add(next);
-                            queue.add(next);
-                        }
+            if (isBonemealCrop(candidateState) && candidateState.getBlock() instanceof BonemealableBlock bonemealable) {
+                if (bonemealable.isValidBonemealTarget(level, candidateCrop, candidateState)) {
+                    if (!result.contains(candidateCrop)) {
+                        result.add(candidateCrop);
+                    }
+                }
+            }
+
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    BlockPos next = current.relative(dir).above(dy);
+                    if (visited.contains(next)) continue;
+                    if (Math.abs(next.getX() - actualTargetPos.getX()) > radius
+                            || Math.abs(next.getZ() - actualTargetPos.getZ()) > radius
+                            || Math.abs(next.getY() - actualTargetPos.getY()) > 2) {
+                        continue;
+                    }
+
+                    BlockState nextState = level.getBlockState(next);
+
+                    // STRICTLY ONLY traverse connected farmland or crops!
+                    // NEVER traverse Grass Blocks, Dirt, or wild foliage!
+                    if (isFarmland(nextState) || isBonemealCrop(nextState)) {
+                        visited.add(next);
+                        queue.add(next);
                     }
                 }
             }
@@ -1024,6 +1340,10 @@ public class FarmingManager {
         Set<BlockPos> visited = new HashSet<>();
         List<BlockPos> result = new ArrayList<>();
 
+        if (!isTillable(level, player, hand, clickedPos)) {
+            return Collections.emptyList();
+        }
+
         queue.add(clickedPos);
         visited.add(clickedPos);
 
@@ -1031,23 +1351,82 @@ public class FarmingManager {
             BlockPos current = queue.poll();
             result.add(current);
 
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dz == 0) continue;
-                    for (int dy = -1; dy <= 1; dy++) {
-                        BlockPos next = current.offset(dx, dy, dz);
-                        if (visited.contains(next)) continue;
-                        if (Math.abs(next.getX() - clickedPos.getX()) > radius
-                                || Math.abs(next.getZ() - clickedPos.getZ()) > radius
-                                || Math.abs(next.getY() - clickedPos.getY()) > 2) {
-                            continue;
-                        }
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    BlockPos next = current.relative(dir).above(dy);
+                    if (visited.contains(next)) continue;
+                    if (Math.abs(next.getX() - clickedPos.getX()) > radius
+                            || Math.abs(next.getZ() - clickedPos.getZ()) > radius
+                            || Math.abs(next.getY() - clickedPos.getY()) > 2) {
+                        continue;
+                    }
 
-                        BlockState nextState = level.getBlockState(next);
-                        if (isFarmland(nextState) || isTillable(level, player, hand, next)) {
-                            visited.add(next);
-                            queue.add(next);
-                        }
+                    // Must be contiguous tillable block! Stops at stone, water, wood, farmland, etc.
+                    if (isTillable(level, player, hand, next)) {
+                        visited.add(next);
+                        queue.add(next);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    public static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startSoilPos, ItemStack seedStack) {
+        int maxLimit = FarmingConfig.MAX_BLOCKS.get();
+        int radius = FarmingConfig.FARMING_RADIUS.get();
+        Queue<BlockPos> queue = new ArrayDeque<>();
+        Set<BlockPos> visited = new HashSet<>();
+        List<BlockPos> result = new ArrayList<>();
+
+        BlockState startState = level.getBlockState(startSoilPos);
+        BlockPos actualSoil = startSoilPos;
+        if (!isValidSoilForSeed(seedStack, startState, level, startSoilPos)) {
+            if (isValidSoilForSeed(seedStack, level.getBlockState(startSoilPos.below()), level, startSoilPos.below())) {
+                actualSoil = startSoilPos.below();
+                startState = level.getBlockState(actualSoil);
+            } else {
+                return Collections.emptyList();
+            }
+        }
+
+        boolean isSoulSandTarget = isSoulSand(startState);
+        boolean isFarmlandTarget = isFarmland(startState);
+
+        queue.add(actualSoil);
+        visited.add(actualSoil);
+
+        while (!queue.isEmpty() && result.size() < maxLimit) {
+            BlockPos current = queue.poll();
+
+            // If space above is air or replaceable, add to result
+            BlockPos above = current.above();
+            BlockState aboveState = level.getBlockState(above);
+            if (aboveState.isAir() || aboveState.canBeReplaced()) {
+                result.add(current);
+            }
+
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    BlockPos next = current.relative(dir).above(dy);
+                    if (visited.contains(next)) continue;
+                    if (Math.abs(next.getX() - actualSoil.getX()) > radius
+                            || Math.abs(next.getZ() - actualSoil.getZ()) > radius
+                            || Math.abs(next.getY() - actualSoil.getY()) > 2) {
+                        continue;
+                    }
+
+                    BlockState nextState = level.getBlockState(next);
+                    boolean matches = false;
+                    if (isSoulSandTarget && isSoulSand(nextState)) {
+                        matches = true;
+                    } else if (isFarmlandTarget && isFarmland(nextState)) {
+                        matches = true;
+                    }
+
+                    if (matches) {
+                        visited.add(next);
+                        queue.add(next);
                     }
                 }
             }
@@ -1056,40 +1435,7 @@ public class FarmingManager {
     }
 
     public static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startFarmPos) {
-        int maxLimit = FarmingConfig.MAX_BLOCKS.get();
-        int radius = FarmingConfig.FARMING_RADIUS.get();
-        Queue<BlockPos> queue = new ArrayDeque<>();
-        Set<BlockPos> visited = new HashSet<>();
-        List<BlockPos> result = new ArrayList<>();
-
-        queue.add(startFarmPos);
-        visited.add(startFarmPos);
-
-        while (!queue.isEmpty() && result.size() < maxLimit) {
-            BlockPos current = queue.poll();
-            result.add(current);
-
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dz == 0) continue;
-                    for (int dy = -1; dy <= 1; dy++) {
-                        BlockPos next = current.offset(dx, dy, dz);
-                        if (visited.contains(next)) continue;
-                        if (Math.abs(next.getX() - startFarmPos.getX()) > radius
-                                || Math.abs(next.getZ() - startFarmPos.getZ()) > radius
-                                || Math.abs(next.getY() - startFarmPos.getY()) > 2) {
-                            continue;
-                        }
-
-                        if (isFarmland(level.getBlockState(next))) {
-                            visited.add(next);
-                            queue.add(next);
-                        }
-                    }
-                }
-            }
-        }
-        return result;
+        return fallbackPlantingSearch(level, startFarmPos, ItemStack.EMPTY);
     }
 
     public static boolean isTillable(Level level, Player player, InteractionHand hand, BlockPos pos) {

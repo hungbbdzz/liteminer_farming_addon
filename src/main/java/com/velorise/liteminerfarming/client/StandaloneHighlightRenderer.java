@@ -33,8 +33,8 @@ public class StandaloneHighlightRenderer {
             return;
         }
 
-        // If LiteMiner is loaded, let LiteMiner handle its own highlight rendering!
-        if (LiteMinerCompat.isLiteMinerLoaded()) {
+        // If LiteMiner or FTB Ultimine is loaded, let them handle their own highlight rendering!
+        if (LiteMinerCompat.isLiteMinerLoaded() || FTBUltimineCompat.isFTBUltimineLoaded()) {
             return;
         }
 
@@ -78,22 +78,27 @@ public class StandaloneHighlightRenderer {
         Collection<BlockPos> previewBlocks = Collections.emptyList();
         float r = 1.0f, g = 0.82f, b = 0.2f, a = 0.8f; // Default golden harvest
 
-        if (FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
-                || FarmingManager.isCrop(level.getBlockState(clickedPos.above()))) {
-            if (heldItem.is(Items.BONE_MEAL)) {
+        if (FarmingEventHandler.isHoe(heldItem) && FarmingManager.isTillable(level, player, hand, clickedPos)) {
+            previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
+            r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
+        } else if (FarmingManager.isPlantableSeed(heldItem) && (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) || FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()))) {
+            previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos, heldItem);
+            r = 0.4f; g = 0.85f; b = 0.3f; // Sprout Green
+        } else if (heldItem.is(Items.BONE_MEAL)) {
+            if (FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
+                    || FarmingManager.isBonemealCrop(clickedState)
+                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))) {
                 previewBlocks = FarmingManager.fallbackCropSearch(level, clickedPos);
                 r = 0.3f; g = 0.9f; b = 0.4f; // Emerald Jade
-            } else if (FarmingManager.isFarmland(clickedState) && level.getBlockState(clickedPos.above()).isAir() && FarmingManager.isPlantableCrop(heldItem)) {
-                previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos);
-                r = 0.4f; g = 0.85f; b = 0.3f; // Sprout Green
-            } else if (!heldItem.is(Items.BONE_MEAL)) {
-                BlockPos targetCrop = (FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState)) ? clickedPos : clickedPos.above();
+            }
+        } else {
+            // Harvest
+            BlockPos targetCrop = (FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState)) ? clickedPos : clickedPos.above();
+            if (FarmingManager.isCrop(level.getBlockState(targetCrop)) || FarmingManager.isColumnCrop(level.getBlockState(targetCrop))
+                    || FarmingManager.isFruitCrop(clickedState) || FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState)) {
                 previewBlocks = FarmingManager.fallbackHarvestSearch(level, targetCrop);
                 r = 1.0f; g = 0.82f; b = 0.2f; // Golden Autumn Harvest
             }
-        } else if (FarmingEventHandler.isHoe(heldItem) && FarmingManager.isTillable(level, player, hand, clickedPos)) {
-            previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
-            r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
         }
 
         if (previewBlocks == null || previewBlocks.isEmpty()) {
@@ -108,12 +113,14 @@ public class StandaloneHighlightRenderer {
 
         poseStack.pushPose();
 
+        boolean isPlanting = (r == 0.4f && g == 0.85f);
         for (BlockPos pos : previewBlocks) {
-            BlockState state = level.getBlockState(pos);
-            VoxelShape shape = state.getShape(level, pos);
+            BlockPos renderPos = isPlanting ? pos.above() : pos;
+            BlockState state = level.getBlockState(renderPos);
+            VoxelShape shape = state.getShape(level, renderPos);
             net.minecraft.world.phys.AABB aabb = shape.isEmpty()
-                    ? new net.minecraft.world.phys.AABB(pos)
-                    : shape.bounds().move(pos);
+                    ? new net.minecraft.world.phys.AABB(renderPos)
+                    : shape.bounds().move(renderPos);
             net.minecraft.world.phys.AABB camRelative = aabb.move(-camPos.x, -camPos.y, -camPos.z);
             LevelRenderer.renderLineBox(poseStack, consumer, camRelative, r, g, b, a);
         }

@@ -30,26 +30,24 @@ public class FarmingEventHandler {
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         Level level = event.getLevel();
-        if (level.isClientSide()) {
-            return;
-        }
-
         Player player = event.getEntity();
-        if (!(player instanceof ServerPlayer serverPlayer)) {
-            return;
-        }
-
         InteractionHand hand = event.getHand();
         ItemStack heldItem = player.getItemInHand(hand);
 
         // Check if activation condition is met (LiteMiner, FTB Ultimine, or Sneak fallback)
         boolean active = false;
         if (LiteMinerCompat.isLiteMinerLoaded()) {
-            active = LiteMinerCompat.isLiteMinerActive(serverPlayer);
+            if (player instanceof ServerPlayer sp) {
+                active = LiteMinerCompat.isLiteMinerActive(sp);
+            }
         }
 
         if (!active && FTBUltimineCompat.isFTBUltimineLoaded()) {
-            active = FTBUltimineCompat.isUltimineActive(serverPlayer);
+            if (player instanceof ServerPlayer sp) {
+                active = FTBUltimineCompat.isUltimineActive(sp);
+            } else {
+                active = FTBUltimineCompat.isUltimineClientActive();
+            }
         }
 
         // If neither LiteMiner nor FTB Ultimine is loaded, use Standalone fallback
@@ -73,18 +71,30 @@ public class FarmingEventHandler {
 
         BlockState clickedState = level.getBlockState(clickedPos);
 
+        // On client side: cancel event if it's an active farming target to prevent ghost prediction
+        if (level.isClientSide()) {
+            if (isFarmingTarget(level, player, hand, clickedPos, clickedState, heldItem)) {
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCanceled(true);
+                player.swing(hand);
+            }
+            return;
+        }
+
+        if (!(player instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+
         // 1. Mass Harvesting (AOE Harvest & Replant)
-        // Works with empty hand, hoe, or any held item when targeting a crop, farmland, or sugar cane
-        // Note: When holding Bone Meal, never harvest here - prioritize fertilizing growing crops in the area!
         if (!heldItem.is(Items.BONE_MEAL)) {
-            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isSugarCane(clickedState);
-            boolean isFarmland = FarmingManager.isFarmland(clickedState);
-            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isSugarCane(level.getBlockState(clickedPos.above()));
+            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState);
+            boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState);
+            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()));
 
-            // If player clicks empty farmland while holding seeds, prioritize mass planting over harvesting
-            boolean plantingOnEmptyFarmland = isFarmland && level.getBlockState(clickedPos.above()).isAir() && FarmingManager.isPlantableCrop(heldItem);
+            // If player clicks empty soil while holding seeds, prioritize mass planting over harvesting
+            boolean plantingOnEmptySoil = isSoil && level.getBlockState(clickedPos.above()).isAir() && FarmingManager.isPlantableSeed(heldItem);
 
-            if (!plantingOnEmptyFarmland && (isDirectCrop || isFarmland || isAboveCrop)) {
+            if (!plantingOnEmptySoil && (isDirectCrop || isSoil || isAboveCrop)) {
                 BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
                 boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
                 if (handled) {
@@ -111,7 +121,7 @@ public class FarmingEventHandler {
         }
 
         // 2. Planting Interaction (Mass Planting)
-        if (FarmingManager.isPlantableCrop(heldItem)) {
+        if (FarmingManager.isPlantableSeed(heldItem)) {
             boolean handled = FarmingManager.handleMassPlanting(serverPlayer, hand, heldItem, clickedPos);
             if (handled) {
                 event.setCancellationResult(InteractionResult.SUCCESS);
@@ -120,8 +130,15 @@ public class FarmingEventHandler {
             return;
         }
 
-        // 3. Bone Meal Interaction (AOE Fertilizing, with fallback to harvesting if all crops are mature)
+        // 3. Bone Meal Interaction (AOE Fertilizing, strictly on farm targets)
         if (heldItem.is(Items.BONE_MEAL)) {
+            boolean isFarmTarget = FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
+                    || FarmingManager.isBonemealCrop(clickedState)
+                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()));
+            if (!isFarmTarget) {
+                return; // Do NOT trigger mass bone meal on wild grass blocks!
+            }
+
             boolean handled = FarmingManager.handleMassBoneMeal(serverPlayer, hand, heldItem, clickedPos);
             if (handled) {
                 event.setCancellationResult(InteractionResult.SUCCESS);
@@ -129,11 +146,10 @@ public class FarmingEventHandler {
                 return;
             }
 
-            // If bone meal could not fertilize anything (i.e. all crops in the area are already fully mature),
-            // automatically harvest and replant them!
-            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isSugarCane(clickedState);
+            // If bone meal could not fertilize anything (all mature), harvest them
+            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState);
             boolean isFarmland = FarmingManager.isFarmland(clickedState);
-            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isSugarCane(level.getBlockState(clickedPos.above()));
+            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()));
             if (isDirectCrop || isFarmland || isAboveCrop) {
                 BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
                 boolean harvestHandled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
@@ -144,6 +160,27 @@ public class FarmingEventHandler {
             }
             return;
         }
+    }
+
+    public static boolean isFarmingTarget(Level level, Player player, InteractionHand hand, BlockPos clickedPos, BlockState clickedState, ItemStack heldItem) {
+        if (isHoe(heldItem) && FarmingManager.isTillable(level, player, hand, clickedPos)) {
+            return true;
+        }
+        if (heldItem.is(Items.BONE_MEAL)) {
+            return FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
+                    || FarmingManager.isBonemealCrop(clickedState)
+                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()));
+        }
+        if (FarmingManager.isPlantableSeed(heldItem)) {
+            if (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos)
+                    || FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below())) {
+                return true;
+            }
+        }
+        boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState);
+        boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState);
+        boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()));
+        return isDirectCrop || isSoil || isAboveCrop;
     }
 
     public static boolean isHoe(ItemStack stack) {
