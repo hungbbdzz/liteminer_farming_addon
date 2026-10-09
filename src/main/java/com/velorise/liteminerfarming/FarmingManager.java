@@ -29,6 +29,7 @@ import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.StemBlock;
+import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
@@ -115,6 +116,94 @@ public class FarmingManager {
         }
 
         return false;
+    }
+
+    /**
+     * Universal check for any crop (mature or immature).
+     */
+    public static boolean isCrop(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        if (isMatureCrop(state)) {
+            return true;
+        }
+        Block block = state.getBlock();
+        if (block instanceof CropBlock
+                || block instanceof NetherWartBlock
+                || block instanceof CocoaBlock
+                || block instanceof SweetBerryBushBlock) {
+            return true;
+        }
+        if (state.is(BlockTags.CROPS)) {
+            return true;
+        }
+        if (block instanceof BushBlock) {
+            for (Property<?> prop : state.getProperties()) {
+                if (prop instanceof IntegerProperty intProp && intProp.getName().equalsIgnoreCase("age")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Universal check for sugar cane block.
+     */
+    public static boolean isSugarCane(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        Block block = state.getBlock();
+        if (block instanceof SugarCaneBlock || state.is(Blocks.SUGAR_CANE)) {
+            return true;
+        }
+        String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("sugar_cane") || id.contains("sugarcane");
+    }
+
+    /**
+     * Finds the bottom-most sugar cane block (root) in the vertical column.
+     */
+    public static BlockPos getSugarCaneRoot(Level level, BlockPos pos) {
+        BlockPos curr = pos;
+        int safety = 0;
+        while (safety < 32 && isSugarCane(level.getBlockState(curr.below()))) {
+            curr = curr.below();
+            safety++;
+        }
+        return curr;
+    }
+
+    /**
+     * Merges individual ItemStacks into compact stacks up to their max stack size.
+     */
+    public static List<ItemStack> mergeItemStacks(List<ItemStack> rawStacks) {
+        List<ItemStack> merged = new ArrayList<>();
+        for (ItemStack raw : rawStacks) {
+            if (raw == null || raw.isEmpty()) {
+                continue;
+            }
+            ItemStack toAdd = raw.copy();
+            for (ItemStack existing : merged) {
+                if (ItemStack.isSameItemSameComponents(existing, toAdd)) {
+                    int space = existing.getMaxStackSize() - existing.getCount();
+                    if (space > 0) {
+                        int addCount = Math.min(space, toAdd.getCount());
+                        existing.grow(addCount);
+                        toAdd.shrink(addCount);
+                        if (toAdd.isEmpty()) {
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!toAdd.isEmpty()) {
+                merged.add(toAdd);
+            }
+        }
+        return merged;
     }
 
     /**
@@ -484,6 +573,9 @@ public class FarmingManager {
         if (selected == null || selected.isEmpty()) {
             selected = LiteMinerCompat.getSelectedBlocks(player, clickedCropPos.below());
         }
+        if (selected == null || selected.isEmpty()) {
+            selected = LiteMinerCompat.getSelectedBlocks(player, clickedCropPos.above());
+        }
 
         if (selected == null || selected.isEmpty()) {
             selected = fallbackHarvestSearch(serverLevel, clickedCropPos);
@@ -502,11 +594,16 @@ public class FarmingManager {
         boolean preventBreaking = LiteMinerCompat.shouldPreventToolBreaking();
         boolean replant = FarmingConfig.REPLANT_CROPS.get();
         boolean damageHoe = FarmingConfig.DAMAGE_HOE_ON_HARVEST.get();
+        boolean collectAtTarget = FarmingConfig.COLLECT_DROPS_AT_TARGET.get();
+        boolean allowSugarCane = FarmingConfig.HARVEST_SUGAR_CANE.get();
         float exhaustion = LiteMinerCompat.getFoodExhaustion();
 
         int harvestedCount = 0;
         SoundType lastSoundType = null;
         BlockState originState = serverLevel.getBlockState(clickedCropPos);
+
+        List<ItemStack> allDrops = new ArrayList<>();
+        Set<BlockPos> processedSugarCaneRoots = new HashSet<>();
 
         for (BlockPos pos : sorted) {
             if (harvestedCount >= maxLimit) {
@@ -520,6 +617,62 @@ public class FarmingManager {
                 }
             }
 
+            // 1. Sugar Cane handling (preserves root block at the bottom)
+            if (allowSugarCane) {
+                BlockPos canePos = null;
+                if (isSugarCane(serverLevel.getBlockState(pos))) {
+                    canePos = pos;
+                } else if (isSugarCane(serverLevel.getBlockState(pos.above()))) {
+                    canePos = pos.above();
+                }
+
+                if (canePos != null) {
+                    BlockPos rootPos = getSugarCaneRoot(serverLevel, canePos);
+                    if (!processedSugarCaneRoots.contains(rootPos)) {
+                        processedSugarCaneRoots.add(rootPos);
+
+                        // Harvest stalks strictly ABOVE rootPos
+                        BlockPos stalkPos = rootPos.above();
+                        while (isSugarCane(serverLevel.getBlockState(stalkPos))) {
+                            if (harvestedCount >= maxLimit) {
+                                break;
+                            }
+                            if (!player.isCreative() && !heldItem.isEmpty() && heldItem.isDamageableItem()) {
+                                if (preventBreaking && heldItem.getDamageValue() >= heldItem.getMaxDamage() - 1) {
+                                    break;
+                                }
+                            }
+
+                            BlockState stalkState = serverLevel.getBlockState(stalkPos);
+                            lastSoundType = stalkState.getSoundType(serverLevel, stalkPos, player);
+
+                            List<ItemStack> stalkDrops = new ArrayList<>(Block.getDrops(stalkState, serverLevel, stalkPos, null, player, heldItem));
+                            if (stalkDrops.isEmpty()) {
+                                stalkDrops.add(new ItemStack(Items.SUGAR_CANE));
+                            }
+
+                            if (collectAtTarget) {
+                                allDrops.addAll(stalkDrops);
+                            } else {
+                                for (ItemStack drop : stalkDrops) {
+                                    if (!drop.isEmpty()) {
+                                        Block.popResource(serverLevel, stalkPos, drop);
+                                    }
+                                }
+                            }
+
+                            serverLevel.destroyBlock(stalkPos, false, player);
+                            harvestedCount++;
+                            applyHarvestCosts(player, hand, heldItem, damageHoe, exhaustion);
+
+                            stalkPos = stalkPos.above();
+                        }
+                    }
+                    continue;
+                }
+            }
+
+            // 2. Standard crop / Sweet Berry Bush handling
             BlockPos cropPos = pos;
             BlockState cropState = serverLevel.getBlockState(cropPos);
 
@@ -544,7 +697,13 @@ public class FarmingManager {
                 BlockState resetBush = cropState.setValue(SweetBerryBushBlock.AGE, 1);
                 serverLevel.setBlock(cropPos, resetBush, 2);
                 serverLevel.gameEvent(player, GameEvent.BLOCK_CHANGE, cropPos);
-                Block.popResource(serverLevel, cropPos, new ItemStack(Items.SWEET_BERRIES, berryCount));
+
+                ItemStack berryDrop = new ItemStack(Items.SWEET_BERRIES, berryCount);
+                if (collectAtTarget) {
+                    allDrops.add(berryDrop);
+                } else {
+                    Block.popResource(serverLevel, cropPos, berryDrop);
+                }
                 serverLevel.playSound(null, cropPos, SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES, SoundSource.BLOCKS, 1.0F, 1.0F);
 
                 harvestedCount++;
@@ -596,10 +755,14 @@ public class FarmingManager {
                 serverLevel.destroyBlock(cropPos, false, player);
             }
 
-            // Drop all harvested items into the world
-            for (ItemStack drop : drops) {
-                if (!drop.isEmpty()) {
-                    Block.popResource(serverLevel, cropPos, drop);
+            // Drop items
+            if (collectAtTarget) {
+                allDrops.addAll(drops);
+            } else {
+                for (ItemStack drop : drops) {
+                    if (!drop.isEmpty()) {
+                        Block.popResource(serverLevel, cropPos, drop);
+                    }
                 }
             }
 
@@ -613,6 +776,15 @@ public class FarmingManager {
         }
 
         if (harvestedCount > 0) {
+            if (collectAtTarget && !allDrops.isEmpty()) {
+                List<ItemStack> mergedDrops = mergeItemStacks(allDrops);
+                for (ItemStack drop : mergedDrops) {
+                    if (!drop.isEmpty()) {
+                        Block.popResource(serverLevel, clickedCropPos, drop);
+                    }
+                }
+            }
+
             if (lastSoundType != null) {
                 serverLevel.playSound(null, clickedCropPos, lastSoundType.getBreakSound(), SoundSource.BLOCKS,
                         (lastSoundType.getVolume() + 1.0F) / 2.0F, lastSoundType.getPitch() * 0.8F);
@@ -662,12 +834,13 @@ public class FarmingManager {
                         if (visited.contains(next)) continue;
                         if (Math.abs(next.getX() - startPos.getX()) > radius
                                 || Math.abs(next.getZ() - startPos.getZ()) > radius
-                                || Math.abs(next.getY() - startPos.getY()) > 2) {
+                                || Math.abs(next.getY() - startPos.getY()) > 3) {
                             continue;
                         }
 
                         BlockState nextState = level.getBlockState(next);
-                        if (isMatureCrop(nextState) || isFarmland(nextState) || isMatureCrop(level.getBlockState(next.above()))) {
+                        if (isCrop(nextState) || isFarmland(nextState) || isCrop(level.getBlockState(next.above()))
+                                || isSugarCane(nextState) || isSugarCane(level.getBlockState(next.above()))) {
                             visited.add(next);
                             queue.add(next);
                         }

@@ -16,8 +16,16 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
 
 public class FarmingEventHandler {
+
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public void onFarmlandTrample(BlockEvent.FarmlandTrampleEvent event) {
+        if (FarmingConfig.PREVENT_FARMLAND_TRAMPLE.get()) {
+            event.setCanceled(true);
+        }
+    }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
@@ -59,13 +67,17 @@ public class FarmingEventHandler {
         BlockState clickedState = level.getBlockState(clickedPos);
 
         // 1. Mass Harvesting (AOE Harvest & Replant)
-        // Works with empty hand, hoe, or any held item when targeting a mature crop (or farmland with a mature crop)
-        // Note: When holding Bone Meal, never harvest - prioritize fertilizing growing crops in the area!
+        // Works with empty hand, hoe, or any held item when targeting a crop, farmland, or sugar cane
+        // Note: When holding Bone Meal, never harvest here - prioritize fertilizing growing crops in the area!
         if (!heldItem.is(Items.BONE_MEAL)) {
-            boolean isDirectCrop = FarmingManager.isMatureCrop(clickedState);
-            boolean isFarmlandWithCrop = FarmingManager.isFarmland(clickedState) && FarmingManager.isMatureCrop(level.getBlockState(clickedPos.above()));
+            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isSugarCane(clickedState);
+            boolean isFarmland = FarmingManager.isFarmland(clickedState);
+            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isSugarCane(level.getBlockState(clickedPos.above()));
 
-            if (isDirectCrop || isFarmlandWithCrop) {
+            // If player clicks empty farmland while holding seeds, prioritize mass planting over harvesting
+            boolean plantingOnEmptyFarmland = isFarmland && level.getBlockState(clickedPos.above()).isAir() && FarmingManager.isPlantableCrop(heldItem);
+
+            if (!plantingOnEmptyFarmland && (isDirectCrop || isFarmland || isAboveCrop)) {
                 BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
                 boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
                 if (handled) {
@@ -112,9 +124,10 @@ public class FarmingEventHandler {
 
             // If bone meal could not fertilize anything (i.e. all crops in the area are already fully mature),
             // automatically harvest and replant them!
-            boolean isDirectCrop = FarmingManager.isMatureCrop(clickedState);
-            boolean isFarmlandWithCrop = FarmingManager.isFarmland(clickedState) && FarmingManager.isMatureCrop(level.getBlockState(clickedPos.above()));
-            if (isDirectCrop || isFarmlandWithCrop) {
+            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isSugarCane(clickedState);
+            boolean isFarmland = FarmingManager.isFarmland(clickedState);
+            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isSugarCane(level.getBlockState(clickedPos.above()));
+            if (isDirectCrop || isFarmland || isAboveCrop) {
                 BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
                 boolean harvestHandled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
                 if (harvestHandled) {

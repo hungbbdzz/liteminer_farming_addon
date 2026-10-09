@@ -34,11 +34,16 @@ It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, 
 * Holding Bone Meal will never accidentally trigger harvesting.
 
 ### 🌾 4. Mass Harvesting (AOE Harvest & Replant)
-* **Right-click** on any mature crop (`Wheat`, `Carrots`, `Potatoes`, `Beetroots`, `Nether Wart`, `Cocoa`, `Sweet Berry Bush`, or modded crops like **Farmer's Delight**) with your LiteMiner key active (or `Shift/Sneak`).
+* **Right-click** on any crop (`Wheat`, `Carrots`, `Potatoes`, `Beetroots`, `Nether Wart`, `Cocoa`, `Sweet Berry Bush`, or modded crops like **Farmer's Delight**) or Farmland with your LiteMiner key active (or `Shift/Sneak`).
 * Works with an **empty hand**, holding a **Hoe**, or any tool.
 * Automatically harvests all mature crops in the selected shape and **replants** them at age 0 using dropped or inventory seeds!
-* Immature crops are safely preserved to keep growing.
+* Immature crops in the selected area are safely preserved while harvesting all mature ones!
+* **Sugar Cane Harvesting:** Right-click sugar cane to harvest the upper stalks while **strictly preserving the bottom root block** to regrow!
+* **Item Drop Aggregation:** All harvested drops are automatically collected and spawned right at the targeted block location in merged stacks, identical to LiteMiner!
 * Supports **Fortune** enchantments if holding an enchanted tool.
+
+### 🛡️ 5. Farmland Trample Prevention
+* Built-in protection preventing Farmland (`#farmland`) from turning back to dirt when players or mobs jump or land on it! Configurable via `prevent_farmland_trample`.
 
 ## 🎮 How It Works
 
@@ -96,6 +101,12 @@ The config file is generated automatically at `.minecraft/config/liteminer_farmi
   damage_hoe_on_harvest = true
   # Continue fertilizing growing crops in the selected area until they reach maturity
   smart_bonemeal = true
+  # Prevent farmland from being trampled into dirt when players or mobs jump or land on it
+  prevent_farmland_trample = true
+  # Gather all harvested item drops at the targeted block position
+  collect_drops_at_target = true
+  # Enable mass harvesting of sugar cane, preserving the bottom root block
+  harvest_sugar_cane = true
 ```
 
 ---
