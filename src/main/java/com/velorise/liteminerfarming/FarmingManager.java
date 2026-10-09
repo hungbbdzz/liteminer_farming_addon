@@ -36,8 +36,12 @@ import net.minecraft.world.level.block.CaveVines;
 import net.minecraft.world.level.block.CaveVinesBlock;
 import net.minecraft.world.level.block.KelpBlock;
 import net.minecraft.world.level.block.KelpPlantBlock;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.SaplingBlock;
+import net.minecraft.world.level.block.grower.TreeGrower;
 import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -48,7 +52,9 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.common.ItemAbilities;
 
+import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class FarmingManager {
 
@@ -74,14 +80,22 @@ public class FarmingManager {
         return isPlantableSeed(stack);
     }
 
+    public static final TagKey<Item> C_SAPLINGS = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "saplings"));
+    public static final TagKey<Block> C_BLOCK_SAPLINGS = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("c", "saplings"));
+    public static final TagKey<Item> FORGE_SAPLINGS = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("forge", "saplings"));
+    public static final TagKey<Block> FORGE_BLOCK_SAPLINGS = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath("forge", "saplings"));
+
+    private static final Map<Block, Boolean> SUPPORTED_2X2_CACHE = new ConcurrentHashMap<>();
+    private static final Map<Block, Boolean> STRICT_2X2_CACHE = new ConcurrentHashMap<>();
+
     /**
-     * Checks if the given ItemStack represents a sapling.
+     * Checks if the given ItemStack represents a sapling (vanilla or modded).
      */
     public static boolean isSapling(ItemStack stack) {
         if (stack.isEmpty()) {
             return false;
         }
-        if (stack.is(ItemTags.SAPLINGS)) {
+        if (stack.is(ItemTags.SAPLINGS) || stack.is(C_SAPLINGS) || stack.is(FORGE_SAPLINGS)) {
             return true;
         }
         Item item = stack.getItem();
@@ -92,13 +106,14 @@ public class FarmingManager {
     }
 
     /**
-     * Checks if a Block is a sapling or propagule.
+     * Checks if a Block is a sapling or propagule (vanilla or modded).
      */
     public static boolean isSaplingBlock(Block block) {
         if (block == null) {
             return false;
         }
-        if (block.defaultBlockState().is(BlockTags.SAPLINGS)) {
+        BlockState state = block.defaultBlockState();
+        if (state.is(BlockTags.SAPLINGS) || state.is(C_BLOCK_SAPLINGS) || state.is(FORGE_BLOCK_SAPLINGS)) {
             return true;
         }
         if (block instanceof SaplingBlock) {
@@ -108,30 +123,113 @@ public class FarmingManager {
         return id.contains("sapling") || id.contains("propagule");
     }
 
-    /**
-     * Trees that STRICTLY require a 2x2 grid to grow (e.g. Dark Oak).
-     * Single 1x1 saplings will never grow in vanilla Minecraft.
-     */
-    public static boolean isStrictly2x2Sapling(Block block) {
-        if (block == Blocks.DARK_OAK_SAPLING) {
-            return true;
+    private static void inspectTreeGrower(Block block) {
+        if (block == null) {
+            return;
         }
+
+        // Vanilla hardcoded knowns
+        if (block == Blocks.DARK_OAK_SAPLING) {
+            SUPPORTED_2X2_CACHE.put(block, true);
+            STRICT_2X2_CACHE.put(block, true);
+            return;
+        }
+        if (block == Blocks.SPRUCE_SAPLING || block == Blocks.JUNGLE_SAPLING) {
+            SUPPORTED_2X2_CACHE.put(block, true);
+            STRICT_2X2_CACHE.put(block, false);
+            return;
+        }
+
+        if (block instanceof SaplingBlock) {
+            try {
+                // Find TreeGrower field in SaplingBlock or its subclasses
+                Object grower = null;
+                Class<?> clazz = block.getClass();
+                while (clazz != null && clazz != Object.class) {
+                    for (Field f : clazz.getDeclaredFields()) {
+                        if (TreeGrower.class.isAssignableFrom(f.getType())) {
+                            f.setAccessible(true);
+                            grower = f.get(block);
+                            break;
+                        }
+                    }
+                    if (grower != null) {
+                        break;
+                    }
+                    clazz = clazz.getSuperclass();
+                }
+
+                if (grower instanceof TreeGrower tg) {
+                    boolean hasMega = false;
+                    boolean hasRegular = false;
+
+                    for (Field gf : TreeGrower.class.getDeclaredFields()) {
+                        gf.setAccessible(true);
+                        Object val = gf.get(tg);
+                        if (val instanceof Optional<?> opt) {
+                            String fname = gf.getName().toLowerCase(Locale.ROOT);
+                            if (fname.contains("mega")) {
+                                if (opt.isPresent()) {
+                                    hasMega = true;
+                                }
+                            } else if (fname.contains("tree") && !fname.contains("grower")) {
+                                if (opt.isPresent()) {
+                                    hasRegular = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (hasMega) {
+                        SUPPORTED_2X2_CACHE.put(block, true);
+                        STRICT_2X2_CACHE.put(block, !hasRegular);
+                        return;
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        // Name-based fallback for modded trees (Regions Unexplored, Biomes O' Plenty, Twilight Forest, etc.)
         String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
-        return id.contains("dark_oak") || id.contains("pale_oak");
+        boolean isStrict = id.contains("dark_oak") || id.contains("pale_oak");
+        boolean isSupported = isStrict || id.contains("spruce") || id.contains("jungle")
+                || id.contains("redwood") || id.contains("sequoia") || id.contains("baobab")
+                || id.contains("cypress") || id.contains("fir") || id.contains("giant_");
+
+        SUPPORTED_2X2_CACHE.put(block, isSupported);
+        STRICT_2X2_CACHE.put(block, isStrict);
     }
 
     /**
-     * Trees that support 2x2 mega structures (Dark Oak, Spruce, Jungle, Redwood).
+     * Trees that STRICTLY require a 2x2 grid to grow (e.g. Dark Oak, or modded trees without 1x1 feature).
+     * Single 1x1 saplings will never grow in vanilla Minecraft.
+     */
+    public static boolean isStrictly2x2Sapling(Block block) {
+        if (block == null) {
+            return false;
+        }
+        Boolean cached = STRICT_2X2_CACHE.get(block);
+        if (cached == null) {
+            inspectTreeGrower(block);
+            cached = STRICT_2X2_CACHE.getOrDefault(block, false);
+        }
+        return cached;
+    }
+
+    /**
+     * Trees that support 2x2 mega structures (Dark Oak, Spruce, Jungle, Redwood, Sequoia, Baobab, etc.).
      */
     public static boolean isSupported2x2Sapling(Block block) {
-        if (isStrictly2x2Sapling(block)) {
-            return true;
+        if (block == null) {
+            return false;
         }
-        if (block == Blocks.SPRUCE_SAPLING || block == Blocks.JUNGLE_SAPLING) {
-            return true;
+        Boolean cached = SUPPORTED_2X2_CACHE.get(block);
+        if (cached == null) {
+            inspectTreeGrower(block);
+            cached = SUPPORTED_2X2_CACHE.getOrDefault(block, false);
         }
-        String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
-        return id.contains("spruce") || id.contains("jungle") || id.contains("redwood");
+        return cached;
     }
 
     /**
