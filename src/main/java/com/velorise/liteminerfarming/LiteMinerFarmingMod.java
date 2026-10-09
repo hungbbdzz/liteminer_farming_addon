@@ -1,8 +1,11 @@
 package com.velorise.liteminerfarming;
 
+import com.velorise.liteminerfarming.client.StandaloneHighlightRenderer;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +18,12 @@ public class LiteMinerFarmingMod {
     public LiteMinerFarmingMod(ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.COMMON, FarmingConfig.SPEC);
         NeoForge.EVENT_BUS.register(new FarmingEventHandler());
-        LOGGER.info("LiteMiner Farming Addon initialized successfully!");
+
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            NeoForge.EVENT_BUS.register(new StandaloneHighlightRenderer());
+        }
+
+        LOGGER.info("Vein Farming: Universal Crop Harvester initialized successfully!");
     }
 }
 

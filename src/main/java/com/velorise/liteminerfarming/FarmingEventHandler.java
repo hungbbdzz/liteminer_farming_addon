@@ -42,15 +42,19 @@ public class FarmingEventHandler {
         InteractionHand hand = event.getHand();
         ItemStack heldItem = player.getItemInHand(hand);
 
-        // Check if activation condition is met
+        // Check if activation condition is met (LiteMiner, FTB Ultimine, or Sneak fallback)
         boolean active = false;
         if (LiteMinerCompat.isLiteMinerLoaded()) {
             active = LiteMinerCompat.isLiteMinerActive(serverPlayer);
         }
 
+        if (!active && FTBUltimineCompat.isFTBUltimineLoaded()) {
+            active = FTBUltimineCompat.isUltimineActive(serverPlayer);
+        }
+
         if (!active && FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
             active = player.isShiftKeyDown();
-        } else if (!active && !LiteMinerCompat.isLiteMinerLoaded() && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
+        } else if (!active && !LiteMinerCompat.isLiteMinerLoaded() && !FTBUltimineCompat.isFTBUltimineLoaded() && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
             active = true;
         }
 

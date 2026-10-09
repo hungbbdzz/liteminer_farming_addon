@@ -19,6 +19,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue PREVENT_FARMLAND_TRAMPLE;
     public static final ModConfigSpec.BooleanValue COLLECT_DROPS_AT_TARGET;
     public static final ModConfigSpec.BooleanValue HARVEST_SUGAR_CANE;
+    public static final ModConfigSpec.BooleanValue STANDALONE_PREVIEW;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -82,8 +83,12 @@ public class FarmingConfig {
                 .define("collect_drops_at_target", true);
 
         HARVEST_SUGAR_CANE = builder
-                .comment("Enable mass harvesting of sugar cane, preserving the bottom root block.")
+                .comment("Enable mass harvesting of sugar cane and column crops, preserving the bottom root block.")
                 .define("harvest_sugar_cane", true);
+
+        STANDALONE_PREVIEW = builder
+                .comment("Enable client-side highlight wireframe preview when LiteMiner is not installed.")
+                .define("standalone_preview", true);
 
         builder.pop();
         SPEC = builder.build();

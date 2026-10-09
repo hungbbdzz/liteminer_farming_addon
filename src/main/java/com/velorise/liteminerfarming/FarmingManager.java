@@ -28,6 +28,13 @@ import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.AttachedStemBlock;
+import net.minecraft.world.level.block.BambooStalkBlock;
+import net.minecraft.world.level.block.CactusBlock;
+import net.minecraft.world.level.block.CaveVines;
+import net.minecraft.world.level.block.CaveVinesBlock;
+import net.minecraft.world.level.block.KelpBlock;
+import net.minecraft.world.level.block.KelpPlantBlock;
 import net.minecraft.world.level.block.StemBlock;
 import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
@@ -102,7 +109,12 @@ public class FarmingManager {
             return state.getValue(SweetBerryBushBlock.AGE) >= 2;
         }
 
-        // 5. Generic check for any BushBlock with an "age" integer property (Farmer's Delight tomato/rice, etc.)
+        // 5. Cave Vines (Glow Berries)
+        if (block instanceof CaveVines || state.is(Blocks.CAVE_VINES) || state.is(Blocks.CAVE_VINES_PLANT)) {
+            return CaveVines.hasGlowBerries(state);
+        }
+
+        // 6. Generic check for any BushBlock with an "age" integer property (Farmer's Delight tomato/rice, etc.)
         if (block instanceof BushBlock) {
             for (Property<?> prop : state.getProperties()) {
                 if (prop instanceof IntegerProperty intProp && intProp.getName().equalsIgnoreCase("age")) {
@@ -125,14 +137,17 @@ public class FarmingManager {
         if (state == null || state.isAir()) {
             return false;
         }
-        if (isMatureCrop(state)) {
+        if (isMatureCrop(state) || isColumnCrop(state) || isFruitCrop(state) || isStem(state)) {
             return true;
         }
         Block block = state.getBlock();
         if (block instanceof CropBlock
                 || block instanceof NetherWartBlock
                 || block instanceof CocoaBlock
-                || block instanceof SweetBerryBushBlock) {
+                || block instanceof SweetBerryBushBlock
+                || block instanceof CaveVines
+                || state.is(Blocks.CAVE_VINES)
+                || state.is(Blocks.CAVE_VINES_PLANT)) {
             return true;
         }
         if (state.is(BlockTags.CROPS)) {
@@ -149,31 +164,79 @@ public class FarmingManager {
     }
 
     /**
-     * Universal check for sugar cane block.
+     * Universal check for vertical column crops (Sugar Cane, Cactus, Bamboo, Kelp).
      */
-    public static boolean isSugarCane(BlockState state) {
+    public static boolean isColumnCrop(BlockState state) {
         if (state == null || state.isAir()) {
             return false;
         }
         Block block = state.getBlock();
-        if (block instanceof SugarCaneBlock || state.is(Blocks.SUGAR_CANE)) {
+        if (block instanceof SugarCaneBlock || state.is(Blocks.SUGAR_CANE)
+                || block instanceof CactusBlock || state.is(Blocks.CACTUS)
+                || block instanceof BambooStalkBlock || state.is(Blocks.BAMBOO)
+                || block instanceof KelpBlock || block instanceof KelpPlantBlock
+                || state.is(Blocks.KELP) || state.is(Blocks.KELP_PLANT)) {
             return true;
         }
         String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
-        return id.contains("sugar_cane") || id.contains("sugarcane");
+        return id.contains("sugar_cane") || id.contains("sugarcane")
+                || id.contains("cactus") || id.contains("bamboo") || id.contains("kelp");
+    }
+
+    public static boolean isSugarCane(BlockState state) {
+        return isColumnCrop(state);
+    }
+
+    public static boolean isSameColumnType(BlockState a, BlockState b) {
+        if (a == null || b == null || a.isAir() || b.isAir()) {
+            return false;
+        }
+        if (a.is(b.getBlock())) {
+            return true;
+        }
+        boolean aIsKelp = a.getBlock() instanceof KelpBlock || a.getBlock() instanceof KelpPlantBlock;
+        boolean bIsKelp = b.getBlock() instanceof KelpBlock || b.getBlock() instanceof KelpPlantBlock;
+        return aIsKelp && bIsKelp;
     }
 
     /**
-     * Finds the bottom-most sugar cane block (root) in the vertical column.
+     * Finds the bottom-most anchor block (root) of a vertical column crop.
      */
-    public static BlockPos getSugarCaneRoot(Level level, BlockPos pos) {
+    public static BlockPos getColumnCropRoot(Level level, BlockPos pos) {
         BlockPos curr = pos;
+        BlockState currState = level.getBlockState(curr);
         int safety = 0;
-        while (safety < 32 && isSugarCane(level.getBlockState(curr.below()))) {
+        while (safety < 64 && isSameColumnType(currState, level.getBlockState(curr.below()))) {
             curr = curr.below();
+            currState = level.getBlockState(curr);
             safety++;
         }
         return curr;
+    }
+
+    public static BlockPos getSugarCaneRoot(Level level, BlockPos pos) {
+        return getColumnCropRoot(level, pos);
+    }
+
+    /**
+     * Universal check for fruit crops with stems (Melon, Pumpkin).
+     */
+    public static boolean isFruitCrop(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        return state.is(Blocks.MELON) || state.is(Blocks.PUMPKIN) || state.is(Blocks.CARVED_PUMPKIN);
+    }
+
+    /**
+     * Universal check for fruit stems that must be protected.
+     */
+    public static boolean isStem(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        Block block = state.getBlock();
+        return block instanceof StemBlock || block instanceof AttachedStemBlock;
     }
 
     /**
@@ -595,7 +658,7 @@ public class FarmingManager {
         boolean replant = FarmingConfig.REPLANT_CROPS.get();
         boolean damageHoe = FarmingConfig.DAMAGE_HOE_ON_HARVEST.get();
         boolean collectAtTarget = FarmingConfig.COLLECT_DROPS_AT_TARGET.get();
-        boolean allowSugarCane = FarmingConfig.HARVEST_SUGAR_CANE.get();
+        boolean allowColumnCrops = FarmingConfig.HARVEST_SUGAR_CANE.get();
         float exhaustion = LiteMinerCompat.getFoodExhaustion();
 
         int harvestedCount = 0;
@@ -603,7 +666,7 @@ public class FarmingManager {
         BlockState originState = serverLevel.getBlockState(clickedCropPos);
 
         List<ItemStack> allDrops = new ArrayList<>();
-        Set<BlockPos> processedSugarCaneRoots = new HashSet<>();
+        Set<BlockPos> processedColumnRoots = new HashSet<>();
 
         for (BlockPos pos : sorted) {
             if (harvestedCount >= maxLimit) {
@@ -617,23 +680,24 @@ public class FarmingManager {
                 }
             }
 
-            // 1. Sugar Cane handling (preserves root block at the bottom)
-            if (allowSugarCane) {
-                BlockPos canePos = null;
-                if (isSugarCane(serverLevel.getBlockState(pos))) {
-                    canePos = pos;
-                } else if (isSugarCane(serverLevel.getBlockState(pos.above()))) {
-                    canePos = pos.above();
+            // 1. Column Crops handling (Sugar Cane, Cactus, Bamboo, Kelp - preserves bottom root)
+            if (allowColumnCrops) {
+                BlockPos colPos = null;
+                if (isColumnCrop(serverLevel.getBlockState(pos))) {
+                    colPos = pos;
+                } else if (isColumnCrop(serverLevel.getBlockState(pos.above()))) {
+                    colPos = pos.above();
                 }
 
-                if (canePos != null) {
-                    BlockPos rootPos = getSugarCaneRoot(serverLevel, canePos);
-                    if (!processedSugarCaneRoots.contains(rootPos)) {
-                        processedSugarCaneRoots.add(rootPos);
+                if (colPos != null) {
+                    BlockPos rootPos = getColumnCropRoot(serverLevel, colPos);
+                    if (!processedColumnRoots.contains(rootPos)) {
+                        processedColumnRoots.add(rootPos);
 
                         // Harvest stalks strictly ABOVE rootPos
                         BlockPos stalkPos = rootPos.above();
-                        while (isSugarCane(serverLevel.getBlockState(stalkPos))) {
+                        BlockState rootState = serverLevel.getBlockState(rootPos);
+                        while (isSameColumnType(rootState, serverLevel.getBlockState(stalkPos))) {
                             if (harvestedCount >= maxLimit) {
                                 break;
                             }
@@ -648,7 +712,7 @@ public class FarmingManager {
 
                             List<ItemStack> stalkDrops = new ArrayList<>(Block.getDrops(stalkState, serverLevel, stalkPos, null, player, heldItem));
                             if (stalkDrops.isEmpty()) {
-                                stalkDrops.add(new ItemStack(Items.SUGAR_CANE));
+                                stalkDrops.add(new ItemStack(stalkState.getBlock().asItem()));
                             }
 
                             if (collectAtTarget) {
@@ -672,7 +736,50 @@ public class FarmingManager {
                 }
             }
 
-            // 2. Standard crop / Sweet Berry Bush handling
+            // 2. Fruit Crops & Stems handling (Melon, Pumpkin - strictly protects stems!)
+            BlockState curState = serverLevel.getBlockState(pos);
+            if (isFruitCrop(curState)) {
+                lastSoundType = curState.getSoundType(serverLevel, pos, player);
+                List<ItemStack> fruitDrops = new ArrayList<>(Block.getDrops(curState, serverLevel, pos, null, player, heldItem));
+                if (collectAtTarget) {
+                    allDrops.addAll(fruitDrops);
+                } else {
+                    for (ItemStack drop : fruitDrops) {
+                        if (!drop.isEmpty()) {
+                            Block.popResource(serverLevel, pos, drop);
+                        }
+                    }
+                }
+                serverLevel.destroyBlock(pos, false, player);
+                harvestedCount++;
+                applyHarvestCosts(player, hand, heldItem, damageHoe, exhaustion);
+                continue;
+            } else if (isStem(curState)) {
+                // Protect stem! Check horizontal neighbors for ripe melon/pumpkin
+                for (Direction dir : Direction.Plane.HORIZONTAL) {
+                    BlockPos fruitNeighbor = pos.relative(dir);
+                    BlockState neighborState = serverLevel.getBlockState(fruitNeighbor);
+                    if (isFruitCrop(neighborState)) {
+                        lastSoundType = neighborState.getSoundType(serverLevel, fruitNeighbor, player);
+                        List<ItemStack> fruitDrops = new ArrayList<>(Block.getDrops(neighborState, serverLevel, fruitNeighbor, null, player, heldItem));
+                        if (collectAtTarget) {
+                            allDrops.addAll(fruitDrops);
+                        } else {
+                            for (ItemStack drop : fruitDrops) {
+                                if (!drop.isEmpty()) {
+                                    Block.popResource(serverLevel, fruitNeighbor, drop);
+                                }
+                            }
+                        }
+                        serverLevel.destroyBlock(fruitNeighbor, false, player);
+                        harvestedCount++;
+                        applyHarvestCosts(player, hand, heldItem, damageHoe, exhaustion);
+                    }
+                }
+                continue;
+            }
+
+            // 3. Standard crop / Sweet Berry Bush / Cave Vines handling
             BlockPos cropPos = pos;
             BlockState cropState = serverLevel.getBlockState(cropPos);
 
@@ -690,7 +797,26 @@ public class FarmingManager {
             Block cropBlock = cropState.getBlock();
             lastSoundType = cropState.getSoundType(serverLevel, cropPos, player);
 
-            // Special case for SweetBerryBush: harvest berries without breaking or consuming seeds
+            // Cave Vines (Glow Berries)
+            if (cropBlock instanceof CaveVines || cropState.is(Blocks.CAVE_VINES) || cropState.is(Blocks.CAVE_VINES_PLANT)) {
+                if (CaveVines.hasGlowBerries(cropState)) {
+                    BlockState resetVines = cropState.setValue(CaveVines.BERRIES, false);
+                    serverLevel.setBlock(cropPos, resetVines, 2);
+                    serverLevel.gameEvent(player, GameEvent.BLOCK_CHANGE, cropPos);
+                    ItemStack berryDrop = new ItemStack(Items.GLOW_BERRIES, 1);
+                    if (collectAtTarget) {
+                        allDrops.add(berryDrop);
+                    } else {
+                        Block.popResource(serverLevel, cropPos, berryDrop);
+                    }
+                    serverLevel.playSound(null, cropPos, SoundEvents.CAVE_VINES_PICK_BERRIES, SoundSource.BLOCKS, 1.0F, 1.0F);
+                    harvestedCount++;
+                    applyHarvestCosts(player, hand, heldItem, damageHoe, exhaustion);
+                }
+                continue;
+            }
+
+            // Sweet Berry Bush: harvest berries without breaking or consuming seeds
             if (cropBlock instanceof SweetBerryBushBlock) {
                 int age = cropState.getValue(SweetBerryBushBlock.AGE);
                 int berryCount = 1 + serverLevel.random.nextInt(2) + (age >= 3 ? 1 : 0);
@@ -812,7 +938,7 @@ public class FarmingManager {
         }
     }
 
-    private static Collection<BlockPos> fallbackHarvestSearch(Level level, BlockPos startPos) {
+    public static Collection<BlockPos> fallbackHarvestSearch(Level level, BlockPos startPos) {
         int maxLimit = FarmingConfig.MAX_BLOCKS.get();
         int radius = FarmingConfig.FARMING_RADIUS.get();
         Queue<BlockPos> queue = new ArrayDeque<>();
@@ -840,7 +966,8 @@ public class FarmingManager {
 
                         BlockState nextState = level.getBlockState(next);
                         if (isCrop(nextState) || isFarmland(nextState) || isCrop(level.getBlockState(next.above()))
-                                || isSugarCane(nextState) || isSugarCane(level.getBlockState(next.above()))) {
+                                || isColumnCrop(nextState) || isColumnCrop(level.getBlockState(next.above()))
+                                || isFruitCrop(nextState) || isStem(nextState)) {
                             visited.add(next);
                             queue.add(next);
                         }
@@ -851,7 +978,7 @@ public class FarmingManager {
         return result;
     }
 
-    private static Collection<BlockPos> fallbackCropSearch(Level level, BlockPos startPos) {
+    public static Collection<BlockPos> fallbackCropSearch(Level level, BlockPos startPos) {
         int maxLimit = FarmingConfig.MAX_BLOCKS.get();
         int radius = FarmingConfig.FARMING_RADIUS.get();
         Queue<BlockPos> queue = new ArrayDeque<>();
@@ -889,7 +1016,7 @@ public class FarmingManager {
         return result;
     }
 
-    private static Collection<BlockPos> fallbackHoeSearch(Player player, InteractionHand hand, BlockPos clickedPos) {
+    public static Collection<BlockPos> fallbackHoeSearch(Player player, InteractionHand hand, BlockPos clickedPos) {
         Level level = player.level();
         int maxLimit = FarmingConfig.MAX_BLOCKS.get();
         int radius = FarmingConfig.FARMING_RADIUS.get();
@@ -928,7 +1055,7 @@ public class FarmingManager {
         return result;
     }
 
-    private static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startFarmPos) {
+    public static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startFarmPos) {
         int maxLimit = FarmingConfig.MAX_BLOCKS.get();
         int radius = FarmingConfig.FARMING_RADIUS.get();
         Queue<BlockPos> queue = new ArrayDeque<>();
@@ -965,7 +1092,7 @@ public class FarmingManager {
         return result;
     }
 
-    private static boolean isTillable(Level level, Player player, InteractionHand hand, BlockPos pos) {
+    public static boolean isTillable(Level level, Player player, InteractionHand hand, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         UseOnContext context = new UseOnContext(player, hand, new BlockHitResult(
                 Vec3.atCenterOf(pos).add(0, 0.5, 0), Direction.UP, pos, false

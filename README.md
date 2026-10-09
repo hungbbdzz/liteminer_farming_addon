@@ -1,22 +1,22 @@
-# 🌾 LiteMiner Farming Addon
+# 🌾 Vein Farming: Universal Crop Harvester
 
 [![NeoForge](https://img.shields.io/badge/NeoForge-1.21.1-orange.svg)](https://neoforged.net/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub](https://img.shields.io/badge/GitHub-hungbbdzz%2Fliteminer__farming__addon-blue.svg)](https://github.com/hungbbdzz/liteminer_farming_addon)
+[![GitHub](https://img.shields.io/badge/GitHub-hungbbdzz%2Fvein--farming-blue.svg)](https://github.com/hungbbdzz/vein-farming)
 
-A lightweight companion addon for **[LiteMiner](https://modrinth.com/mod/liteminer)** on **NeoForge 1.21.1**.  
-It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, **AOE Bone Meal Fertilizing**, and **Mass Harvesting with Auto-Replant** to LiteMiner, strictly following LiteMiner's active shape system and client-side block highlight preview!
+The ultimate universal AOE farming mod for **NeoForge 1.21.1**.  
+Built as a seamless companion for **[LiteMiner](https://modrinth.com/mod/liteminer)** and **[FTB Ultimine](https://modrinth.com/mod/ftb-ultimine)**, with full **Standalone Mode** support featuring its own client-side highlight outline preview!
 
-![LiteMiner Farming Addon Showcase](https://raw.githubusercontent.com/hungbbdzz/liteminer_farming_addon/main/showcase.gif)
+Brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, **Smart AOE Bone Meal**, **Root-Preserving Column Crop Harvesting**, and **Stem-Protected Fruit Harvesting with Auto-Replant** to Minecraft!
 
 ---
 
-## ✨ Features
+## ✨ Universal Features
 
 ### 🚜 1. Mass Tilling (Area Hoe)
-* Hold any **Hoe** and press your **LiteMiner activation key** (or hold `Shift/Sneak`).
+* Hold any **Hoe** and press your **LiteMiner / FTB Ultimine activation key** (or hold `Shift/Sneak`).
 * **Right-click** on any tillable soil (`Grass Block`, `Dirt`, `Coarse Dirt`, `Rooted Dirt`, etc.).
-* All blocks in your active LiteMiner shape (`3x3`, `Shapeless`, `Tunnel`...) are converted into **Farmland**!
+* All blocks in your active shape (`3x3`, `Shapeless`, `Tunnel`...) are converted into **Farmland**!
 * **Safe Foliage Clearing:** Automatically clears wild grass, ferns, and flowers above the soil without ever harming pre-existing crops.
 * **Tool Protection:** Respects tool durability and stops before your tool breaks (`prevent_tool_breaking`).
 
@@ -24,40 +24,49 @@ It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, 
 * Hold any **Seeds or Crops** (`Wheat`, `Carrot`, `Potato`, `Beetroot`, `Melon`, `Pumpkin`, `Torchflower`, `Pitcher Pod`...).
 * Fully compatible with modded crops like **Farmer's Delight** (Tomato, Cabbage, Onion, Rice...).
 * Fully compatible with modded farmland like **Rich Soil Farmland**.
-* **Right-click** on Farmland with your LiteMiner key active to carpet-plant all empty Farmland blocks in the selected shape!
+* **Right-click** on Farmland to carpet-plant all empty Farmland blocks in the selected shape!
 * **Smart Inventory Replenishment:** If the stack in your hand runs out, the mod automatically consumes matching seeds from your inventory.
 
 ### 🦴 3. AOE Bone Meal (Smart Fertilizing)
-* Hold **Bone Meal** and **Right-click** on crops with your LiteMiner key active.
+* Hold **Bone Meal** and **Right-click** on crops.
 * **Smart Area Growth:** Even if the block you are looking at is already fully mature, Bone Meal will automatically bypass it and continue fertilizing all other growing crops in the selected area until they reach 100% maturity!
 * In **Creative Mode**, bone meal is never consumed. In Survival, it safely draws from your hand and inventory as needed.
-* Holding Bone Meal will never accidentally trigger harvesting.
 
-### 🌾 4. Mass Harvesting (AOE Harvest & Replant)
-* **Right-click** on any crop (`Wheat`, `Carrots`, `Potatoes`, `Beetroots`, `Nether Wart`, `Cocoa`, `Sweet Berry Bush`, or modded crops like **Farmer's Delight**) or Farmland with your LiteMiner key active (or `Shift/Sneak`).
+### 🌾 4. Universal Mass Harvesting
+* **Right-click** on any crop or farmland to trigger harvest.
 * Works with an **empty hand**, holding a **Hoe**, or any tool.
-* Automatically harvests all mature crops in the selected shape and **replants** them at age 0 using dropped or inventory seeds!
-* Immature crops in the selected area are safely preserved while harvesting all mature ones!
-* **Sugar Cane Harvesting:** Right-click sugar cane to harvest the upper stalks while **strictly preserving the bottom root block** to regrow!
-* **Item Drop Aggregation:** All harvested drops are automatically collected and spawned right at the targeted block location in merged stacks, identical to LiteMiner!
+* **Auto-Replant:** Automatically harvests all mature crops and **replants** them at age 0 using dropped or inventory seeds!
+* **Immature Crop Safety:** Immature crops in the selected area are safely preserved while harvesting all mature ones!
+* **Vertical Column Crops (Sugar Cane, Cactus, Bamboo, Kelp):** Automatically identifies the bottom root/anchor block and **strictly preserves the root**, only harvesting the stalks above it!
+* **Fruit & Stem Protection (Melon, Pumpkin):** Harvests ripe melons and pumpkins while **strictly protecting and preserving stems (`StemBlock`)**!
+* **Berry Picking:** Gathers **Sweet Berries** and **Cave Vines (Glow Berries)** and resets their age without breaking the vine/bush.
+* **Item Drop Aggregation:** All harvested drops are automatically merged into compact stacks and spawned right at the targeted block location, identical to LiteMiner!
 * Supports **Fortune** enchantments if holding an enchanted tool.
 
 ### 🛡️ 5. Farmland Trample Prevention
 * Built-in protection preventing Farmland (`#farmland`) from turning back to dirt when players or mobs jump or land on it! Configurable via `prevent_farmland_trample`.
 
-## 🎮 How It Works
-
-### With LiteMiner (Recommended Addon Mode)
-1. Select your desired shape in LiteMiner (e.g. `3x3`, `Shapeless`, etc.).
-2. Hold your LiteMiner veinmine key (`~` by default). The highlight shows the exact target blocks!
-3. **Right-click** with a Hoe, Seeds, Bone Meal, or empty hand on mature crops!
-
-### Standalone Mode (No LiteMiner Required)
-LiteMiner is **completely optional**. You can install and use this mod on its own as a standalone farming quality-of-life mod:
-* Simply hold **Sneak (`Shift`)** while right-clicking!
-* All 4 core farming actions (Area Tilling, Mass Planting, Bone Meal, and Mass Harvesting & Replanting) work out of the box.
+### 👁️ 6. Standalone Client Highlight Preview
+* When LiteMiner is not installed, the mod renders its own real-time **wireframe bounding box highlight** on target blocks when holding Sneak!
+* Color-coded preview:
+  - 🌾 **Golden Amber:** Harvesting
+  - 🌿 **Sprout Green:** Planting
+  - 💎 **Emerald Jade:** Bone Meal fertilizing
+  - 🟫 **Earth Brown:** Tilling (Hoe)
 
 ---
+
+## 🎮 How It Works
+
+### With LiteMiner or FTB Ultimine
+1. Select your desired shape (e.g. `3x3`, `Shapeless`, etc.).
+2. Hold your veinmine key (`~` by default). The highlight shows the exact target blocks!
+3. **Right-click** with a Hoe, Seeds, Bone Meal, or empty hand on crops!
+
+### Standalone Mode (No Miner Mod Required)
+LiteMiner and FTB Ultimine are **completely optional**:
+* Simply hold **Sneak (`Shift`)** while right-clicking!
+* Real-time client wireframe outline shows you exactly which blocks will be affected.
 
 ## ⚖️ LiteMiner Addon vs. Standalone Mode
 
@@ -116,8 +125,8 @@ The config file is generated automatically at `.minecraft/config/liteminer_farmi
 Clone the repository and build using Gradle:
 
 ```bash
-git clone https://github.com/hungbbdzz/liteminer_farming_addon.git
-cd liteminer_farming_addon
+git clone https://github.com/hungbbdzz/vein-farming.git
+cd vein-farming
 ./gradlew build
 ```
 

@@ -1,8 +1,8 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
-issueTrackerURL="https://github.com/hungbbdzz/liteminer_farming_addon/issues"
-displayURL="https://github.com/hungbbdzz/liteminer_farming_addon"
+issueTrackerURL="https://github.com/hungbbdzz/vein-farming/issues"
+displayURL="https://github.com/hungbbdzz/vein-farming"
 
 [[mods]]
 modId="${mod_id}"
@@ -28,6 +28,13 @@ side="BOTH"
 
 [[dependencies.liteminer_farming_addon]]
 modId="liteminer"
+type="optional"
+versionRange="*"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.liteminer_farming_addon]]
+modId="ftbultimine"
 type="optional"
 versionRange="*"
 ordering="AFTER"
