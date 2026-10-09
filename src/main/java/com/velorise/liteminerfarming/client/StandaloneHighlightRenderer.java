@@ -49,6 +49,7 @@ public class StandaloneHighlightRenderer {
     private boolean cachedIsHoe = false;
     private BlockState cachedGhostPlantState = null;
     private BlockState cachedGhostOffState = null;
+    private boolean lastSmartPlantEnabled = true;
 
     private boolean lastWasAttacking = false;
 
@@ -88,15 +89,18 @@ public class StandaloneHighlightRenderer {
             return;
         }
 
-        // Check activation condition: FTB Ultimine keybind, or Shift fallback in standalone mode
+        boolean currentSmartPlant = ModKeyMappings.isSmartPlantEnabled();
+        if (currentSmartPlant != lastSmartPlantEnabled) {
+            clearCache();
+            lastSmartPlantEnabled = currentSmartPlant;
+        }
+
+        // Check activation condition: FTB Ultimine keybind, or dedicated key / Shift fallback in standalone mode
         boolean active = false;
         if (FTBUltimineCompat.isFTBUltimineLoaded()) {
             active = FTBUltimineCompat.isUltimineClientActive();
         } else {
-            active = player.isShiftKeyDown();
-            if (!active && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-                active = true;
-            }
+            active = ModKeyMappings.isKeyActive();
         }
 
         if (!active) {
@@ -195,12 +199,13 @@ public class StandaloneHighlightRenderer {
                         : ((FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) && (level.getBlockState(clickedPos.above()).isAir() || level.getBlockState(clickedPos.above()).canBeReplaced()))
                            || (FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()) && (clickedState.isAir() || clickedState.canBeReplaced())))
             )) {
-                previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos, heldItem);
+                previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos, heldItem, ModKeyMappings.isSmartPlantEnabled());
                 r = 0.4f; g = 0.85f; b = 0.3f; // Sprout Green
                 isPlanting = true;
                 if (FarmingConfig.GHOST_PLANT_PREVIEW.get()) {
                     ghostPlantState = getPlantedBlockState(heldItem);
-                    if (FarmingConfig.SMART_INTERCROPPING.get()
+                    if (ModKeyMappings.isSmartPlantEnabled()
+                            && FarmingConfig.SMART_INTERCROPPING.get()
                             && FarmingManager.isIntercroppableCrop(heldItem)
                             && FarmingManager.isIntercroppableCrop(offItem)
                             && !heldItem.is(offItem.getItem())) {
@@ -244,7 +249,7 @@ public class StandaloneHighlightRenderer {
         poseStack.pushPose();
 
         Map<BlockPos, Block> plannedIntercrop = null;
-        if (isPlanting && ghostOffState != null) {
+        if (isPlanting && ghostOffState != null && ModKeyMappings.isSmartPlantEnabled()) {
             BlockPos originSoilPos = FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) ? clickedPos : clickedPos.below();
             Block mainCropBlock = FarmingManager.getCropBlock(heldItem);
             Block offCropBlock = FarmingManager.getCropBlock(offItem);

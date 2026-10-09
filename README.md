@@ -11,10 +11,21 @@ Brings **Area Tilling**, **Smart Mass Planting with Advanced Spatial Algorithms*
 
 ---
 
+## 🎮 Controls & Keybindings
+
+All keybindings can be customized in the standard Minecraft **Options -> Controls -> Key Binds -> Vein Farming** menu:
+
+| Keybind | Default Key | Description |
+| :--- | :--- | :--- |
+| **Farming Veinmine / Mass Action** | `Left Shift` | Hold to activate mass farming actions (tilling, planting, harvesting, bone meal, destroying). When LiteMiner or FTB Ultimine is installed, their activation keys also trigger mass actions. |
+| **Toggle Smart Planting** | *Unbound* (None) | Instantly toggle between **Smart Planting** (spatial algorithms active) and **Uniform Carpet Planting** (plants all viable soils without spacing/layout filters). Displays an action bar message and immediately updates the client preview! |
+
+---
+
 ## ✨ Features & Mechanics
 
 ### 🚜 1. Mass Tilling (Area Hoe)
-* Hold any **Hoe** and press your **LiteMiner / FTB Ultimine activation key** (or hold `Sneak/Shift`).
+* Hold any **Hoe** and press your **Vein Farming activation key** (or hold `Sneak/Shift`).
 * **Right-click** on any tillable soil (`Grass Block`, `Dirt`, `Coarse Dirt`, `Rooted Dirt`, etc.).
 * All blocks in your active shape (`3x3`, `Shapeless`, `Tunnel`...) are converted into **Farmland**!
 * **Safe Foliage Clearing:** Automatically clears wild grass, ferns, and flowers above the soil without ever harming pre-existing crops.
@@ -39,8 +50,13 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
    * Automatically leaves empty adjacent dirt/farmland spots for fruit to spawn, guaranteeing **0% growth penalty** and maximum fruit spawn rates.
 3. **🌵 Maximum Independent Set (MIS) Cactus Planting (`smart_cactus_planting`):**
    * Solves a bipartite maximum independent set grid graph in real time to ensure no two planted cacti are orthogonally adjacent (which would cause them to break and pop off).
-4. **🌸 Anti-Overcrowding Flora Layout (`smart_flower_planting`):**
-   * Automatically spaces Flowers (`#minecraft:flowers`), Mushrooms (`#c:mushrooms`, Red/Brown Mushroom, Nether Fungi), and Chorus Flowers in a checkerboard pattern ($\ge 2$ Manhattan distance), avoiding clumping.
+4. **🌸 Organic Flora & Mushroom Meadow Distribution (`smart_flower_planting`):**
+   * Employs procedural coherent value noise to mimic realistic wildflower meadows and mushroom groves.
+   * Replaces rigid, repetitive 1-space-1-space chessboard grids with organic natural variation:
+     - **Natural Clumps ("crowd a bit"):** Small companion clusters of 2-3 flowers/mushrooms.
+     - **Sparse Scattering ("sparse away"):** Solitary blooms dotting the landscape with 2-4 block gaps.
+     - **Natural Clearings ("no fixed shape"):** Open breathing glades without flowers.
+     - **Anti-Overcrowding:** Prevents unnatural solid blobs (no 2x2 blocks or 3-way orthogonal clumping).
 5. **🍫 Cocoa Bean Trunk Planting:**
    * Right-click on Jungle Logs with Cocoa Beans to plant them on all available horizontal bark faces!
 6. **🔄 Context-Aware Intercropping (Xen Canh) (`smart_intercropping`):**
@@ -90,7 +106,7 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
 ---
 
 ### 👁️ 8. Standalone Real-Time 3D Wireframe Preview
-When LiteMiner is not installed, the mod renders its own client-side **wireframe bounding box highlight** on target blocks when holding Sneak:
+When LiteMiner is not installed, the mod renders its own client-side **wireframe bounding box highlight** on target blocks when holding Sneak or the activation key:
 * 🌾 **Golden Amber:** Mass Harvesting
 * 🌿 **Sprout Green:** Mass Planting
 * 🛑 **Crimson Red:** Mass Destruction
@@ -106,7 +122,7 @@ The codebase has been refactored from a monolithic class into a decoupled, high-
 | Class | Responsibility |
 | :--- | :--- |
 | **`PlantClassifier.java`** | Universal tags, block & item categorization, soil validation, and crop maturity logic. |
-| **`PlantingAlgorithms.java`** | Spatial layout algorithms: 2x2 sapling groves, cactus bipartite MIS, fruit stem 40/40 layouts, and intercropping row parity. |
+| **`PlantingAlgorithms.java`** | Spatial layout algorithms: 2x2 sapling groves, cactus bipartite MIS, fruit stem 40/40 layouts, organic flora meadow noise, and intercropping row parity. |
 | **`PlantingManager.java`** | Mass planting execution, Cocoa Bean log wrapping, and BFS candidate search. |
 | **`HarvestManager.java`** | Mass harvesting, auto-replanting, left-click destruction, and harvest BFS search. |
 | **`TillingAndFertilizingManager.java`** | Mass hoe tilling, AOE bone meal fertilizing, and batch composting. |
@@ -164,7 +180,7 @@ The configuration file is generated automatically at `.minecraft/config/litemine
   smart_melon_pumpkin_planting = true
   # Alternating row intercropping when holding different seeds in both hands
   smart_intercropping = true
-  # Anti-overcrowding checkerboard spacing for flowers, mushrooms, and chorus flowers
+  # Organic meadow distribution for flowers, mushrooms, and chorus flowers
   smart_flower_planting = true
   # Batch composter processing up to 128 items in one click
   batch_composter = true

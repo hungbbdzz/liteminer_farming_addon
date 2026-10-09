@@ -1,6 +1,11 @@
 {
-  "mod.liteminer_farming_addon.name": "LiteMiner Farming Addon",
-  "mod.liteminer_farming_addon.description": "An addon for LiteMiner on NeoForge providing Area Tilling (Hoe), Mass Planting (Seeds/Crops), and AOE Bone Meal fertilizing.",
+  "mod.liteminer_farming_addon.name": "Vein Farming: Universal Crop Harvester",
+  "mod.liteminer_farming_addon.description": "An addon for LiteMiner and Standalone mode providing Area Tilling, Smart Mass Planting, and AOE Bone Meal fertilizing.",
+  "key.categories.liteminer_farming_addon": "Vein Farming",
+  "key.liteminer_farming_addon.activate": "Farming Veinmine / Mass Action",
+  "key.liteminer_farming_addon.toggle_smart_plant": "Toggle Smart Planting",
+  "message.liteminer_farming_addon.smart_plant.enabled": "Smart Planting: ENABLED",
+  "message.liteminer_farming_addon.smart_plant.disabled": "Smart Planting: DISABLED",
   "config.liteminer_farming_addon.general": "General Settings",
   "config.liteminer_farming_addon.max_blocks": "Maximum Blocks Affected",
   "config.liteminer_farming_addon.farming_radius": "Farming Radius",
@@ -11,4 +16,3 @@
   "config.liteminer_farming_addon.require_sneak_fallback": "Require Sneak Fallback",
   "config.liteminer_farming_addon.use_liteminer_limit": "Use LiteMiner Limit"
 }
-

@@ -246,10 +246,46 @@ public class PlantingAlgorithms {
         return result;
     }
 
+    public static float hash2DFloat(int x, int z, long seed) {
+        long h = ((long) x * 3129871L ^ (long) z * 116129781L ^ seed);
+        h = (h ^ (h >>> 30)) * 0xbf58476d1ce4e5b9L;
+        h = (h ^ (h >>> 27)) * 0x94d049bb133111ebL;
+        h = h ^ (h >>> 31);
+        return (float) ((h & 0xFFFFFFFFL) / (double) 0xFFFFFFFFL);
+    }
+
+    public static float floraSmoothNoise(int x, int z, float scale, long seed) {
+        float gx = x / scale;
+        float gz = z / scale;
+        int x0 = (int) Math.floor(gx);
+        int z0 = (int) Math.floor(gz);
+        int x1 = x0 + 1;
+        int z1 = z0 + 1;
+        float fx = gx - x0;
+        float fz = gz - z0;
+        float sx = fx * fx * (3.0f - 2.0f * fx);
+        float sz = fz * fz * (3.0f - 2.0f * fz);
+
+        float n00 = hash2DFloat(x0, z0, seed);
+        float n10 = hash2DFloat(x1, z0, seed);
+        float n01 = hash2DFloat(x0, z1, seed);
+        float n11 = hash2DFloat(x1, z1, seed);
+
+        float nx0 = n00 * (1.0f - sx) + n10 * sx;
+        float nx1 = n01 * (1.0f - sx) + n11 * sx;
+        return nx0 * (1.0f - sz) + nx1 * sz;
+    }
+
     /**
-     * Filters candidate soil positions for Flowers, Mushrooms, and Chorus Flowers using anti-overcrowding.
-     * Enforces checkerboard parity (Manhattan distance >= 2) and avoids placing directly
-     * adjacent to pre-existing flowers or mushrooms in the world.
+     * Organic Flora & Mushroom Meadow Distribution:
+     * Generates natural, irregular wildflower and mushroom distributions:
+     * - Organic clumps ("crowd a bit"): 2-3 flowers grow close together in natural clusters.
+     * - Sparse scattering ("sparse away"): Single blooms dotting the landscape with 2-4 block spaces.
+     * - Natural clearings & irregular glades ("dont have a fixed shape"): Open breathing gaps without flowers,
+     *   completely eliminating rigid 1-by-1 checkerboard grid monotony.
+     * - Anti-overcrowding: Prevents dense solid slabs (no 2x2 blobs or 3-way orthogonal adjacency).
+     * - Origin click preservation: The clicked block is always guaranteed to receive a plant if viable.
+     * - Deterministic: Consistent preview and execution based on coordinates and world seed.
      */
     public static List<BlockPos> filterAntiOvercrowdedFloraPositions(
             Level level,
@@ -264,13 +300,39 @@ public class PlantingAlgorithms {
             return candidateSoils;
         }
 
-        int originParity = Math.floorMod(originSoilPos.getX() + originSoilPos.getZ(), 2);
-        List<BlockPos> result = new ArrayList<>();
+        boolean isDoubleTall = seedStack.getItem() instanceof BlockItem bi && bi.getBlock() instanceof DoublePlantBlock;
+        long seed = (long) level.dimension().location().hashCode() ^ 0x5a1f89c4L;
 
-        for (BlockPos soil : candidateSoils) {
-            // 1. Checkerboard parity prevents orthogonal clumping (guarantees Manhattan distance >= 2 between plants)
-            int parity = Math.floorMod(soil.getX() + soil.getZ(), 2);
-            if (parity != originParity) {
+        List<BlockPos> result = new ArrayList<>();
+        Set<BlockPos> chosenPlants = new HashSet<>();
+        Set<BlockPos> candidateSoilSet = new HashSet<>(candidateSoils);
+
+        // 1. Always prioritize the directly clicked origin soil pos
+        if (originSoilPos != null && candidateSoilSet.contains(originSoilPos)) {
+            BlockPos plantPos = originSoilPos.above();
+            BlockState plantState = level.getBlockState(plantPos);
+            boolean spaceOk = plantState.isAir() || plantState.canBeReplaced();
+            if (isDoubleTall && spaceOk) {
+                BlockState above2 = level.getBlockState(plantPos.above());
+                if (!above2.isAir() && !above2.canBeReplaced()) {
+                    spaceOk = false;
+                }
+            }
+            if (spaceOk) {
+                result.add(originSoilPos);
+                chosenPlants.add(plantPos);
+            }
+        }
+
+        // 2. Sort candidate soils outward from origin for natural spatial expansion
+        List<BlockPos> sortedCandidates = new ArrayList<>(candidateSoils);
+        if (originSoilPos != null) {
+            sortedCandidates.sort(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)));
+        }
+
+        // 3. Natural Organic Distribution
+        for (BlockPos soil : sortedCandidates) {
+            if (originSoilPos != null && soil.equals(originSoilPos)) {
                 continue;
             }
 
@@ -280,30 +342,83 @@ public class PlantingAlgorithms {
                 continue;
             }
 
-            // 2. Anti-overcrowding against pre-existing flora in the world
-            boolean nearExistingFlora = false;
-            for (Direction dir : Direction.Plane.HORIZONTAL) {
-                BlockPos neighborPlant = plantPos.relative(dir);
-                BlockState neighborState = level.getBlockState(neighborPlant);
-                if (PlantClassifier.isFlowerBlock(neighborState) || PlantClassifier.isMushroomBlock(neighborState)) {
-                    nearExistingFlora = true;
-                    break;
-                }
-            }
-            if (nearExistingFlora) {
-                continue;
-            }
-
-            // 3. For double-tall plants (DoublePlantBlock / TallFlowerBlock), ensure space above exists
-            if (seedStack.getItem() instanceof BlockItem bi && bi.getBlock() instanceof DoublePlantBlock) {
+            if (isDoubleTall) {
                 BlockState above2 = level.getBlockState(plantPos.above());
                 if (!above2.isAir() && !above2.canBeReplaced()) {
                     continue;
                 }
             }
 
-            result.add(soil);
+            // Count pre-existing flowers/mushrooms in the world adjacent to plantPos
+            int existingAdjacent = 0;
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                BlockState neighborState = level.getBlockState(plantPos.relative(dir));
+                if (PlantClassifier.isFlowerBlock(neighborState) || PlantClassifier.isMushroomBlock(neighborState)) {
+                    existingAdjacent++;
+                }
+            }
+            if (existingAdjacent >= 2) {
+                // Too close to pre-existing clumps in the world
+                continue;
+            }
+
+            // Count orthogonal chosen neighbors (distance = 1)
+            int chosenAdjacent = 0;
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                if (chosenPlants.contains(plantPos.relative(dir))) {
+                    chosenAdjacent++;
+                }
+            }
+            int totalAdjacent = existingAdjacent + chosenAdjacent;
+
+            // Count diagonal chosen neighbors (distance = sqrt(2))
+            int diagonalAdjacent = 0;
+            for (int dx = -1; dx <= 1; dx += 2) {
+                for (int dz = -1; dz <= 1; dz += 2) {
+                    if (chosenPlants.contains(plantPos.offset(dx, 0, dz))) {
+                        diagonalAdjacent++;
+                    }
+                }
+            }
+
+            // Coherent multi-scale organic meadow noise
+            float cNoise = floraSmoothNoise(soil.getX(), soil.getZ(), 6.5f, seed);
+            float dNoise = hash2DFloat(soil.getX(), soil.getZ(), seed + 1013L);
+
+            boolean accept = false;
+
+            if (cNoise >= 0.55f) {
+                // Zone A: Cluster Core ("crowd a bit")
+                // Small natural clumps of 2-3 flowers, but max 1 orthogonal neighbor and max 2 total neighbors
+                if (totalAdjacent <= 1 && (totalAdjacent + diagonalAdjacent) <= 2) {
+                    if (dNoise < 0.48f) {
+                        accept = true;
+                    }
+                }
+            } else if (cNoise >= 0.28f) {
+                // Zone B: Sparse Meadow ("sparse away")
+                // Dispersed blooms: cannot touch another plant orthogonally (distance >= 2)
+                if (totalAdjacent == 0) {
+                    if (dNoise < 0.22f) {
+                        accept = true;
+                    }
+                }
+            } else {
+                // Zone C: Open Glade ("dont have a fixed shape")
+                // Breathing room clearings: strictly isolated (distance >= 2 and no diagonals)
+                if (totalAdjacent == 0 && diagonalAdjacent == 0) {
+                    if (dNoise < 0.05f) {
+                        accept = true;
+                    }
+                }
+            }
+
+            if (accept) {
+                result.add(soil);
+                chosenPlants.add(plantPos);
+            }
         }
+
         return result;
     }
 
@@ -671,3 +786,4 @@ public class PlantingAlgorithms {
         return Math.floorMod(rowCoord, 2) == 0;
     }
 }
+

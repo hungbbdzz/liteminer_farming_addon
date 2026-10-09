@@ -262,6 +262,9 @@ public class FarmingManager {
     public static Collection<BlockPos> fallbackCocoaPlantingSearch(Level level, BlockPos startPos) {
         return PlantingManager.fallbackCocoaPlantingSearch(level, startPos);
     }
+    public static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startSoilPos, ItemStack seedStack, boolean applySmartPlant) {
+        return PlantingManager.fallbackPlantingSearch(level, startSoilPos, seedStack, applySmartPlant);
+    }
     public static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startSoilPos, ItemStack seedStack) {
         return PlantingManager.fallbackPlantingSearch(level, startSoilPos, seedStack);
     }

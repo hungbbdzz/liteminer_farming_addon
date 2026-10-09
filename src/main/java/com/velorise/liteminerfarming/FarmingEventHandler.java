@@ -228,6 +228,31 @@ public class FarmingEventHandler {
         return isDirectCrop || isSoil || isAboveCrop;
     }
 
+    private static final java.util.Map<java.util.UUID, Boolean> ACTIVE_KEYS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<java.util.UUID, Boolean> SMART_PLANT_ENABLED = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void setPlayerKeyActive(java.util.UUID uuid, boolean active) {
+        if (active) {
+            ACTIVE_KEYS.put(uuid, true);
+        } else {
+            ACTIVE_KEYS.remove(uuid);
+        }
+    }
+
+    public static void setPlayerSmartPlantEnabled(java.util.UUID uuid, boolean enabled) {
+        SMART_PLANT_ENABLED.put(uuid, enabled);
+    }
+
+    public static boolean isPlayerSmartPlantEnabled(java.util.UUID uuid) {
+        return SMART_PLANT_ENABLED.getOrDefault(uuid, true);
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedOut(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
+        ACTIVE_KEYS.remove(event.getEntity().getUUID());
+        SMART_PLANT_ENABLED.remove(event.getEntity().getUUID());
+    }
+
     public static boolean isHoe(ItemStack stack) {
         if (stack.isEmpty()) {
             return false;
@@ -260,6 +285,9 @@ public class FarmingEventHandler {
             }
         }
         if (!LiteMinerCompat.isLiteMinerLoaded() && !FTBUltimineCompat.isFTBUltimineLoaded()) {
+            if (ACTIVE_KEYS.getOrDefault(player.getUUID(), false)) {
+                return true;
+            }
             if (FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
                 return player.isShiftKeyDown();
             } else {
