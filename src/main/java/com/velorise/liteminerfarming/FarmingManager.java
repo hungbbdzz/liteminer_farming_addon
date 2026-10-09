@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
@@ -36,6 +37,7 @@ import net.minecraft.world.level.block.CaveVinesBlock;
 import net.minecraft.world.level.block.KelpBlock;
 import net.minecraft.world.level.block.KelpPlantBlock;
 import net.minecraft.world.level.block.StemBlock;
+import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.SugarCaneBlock;
 import net.minecraft.world.level.block.SweetBerryBushBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -70,6 +72,273 @@ public class FarmingManager {
 
     public static boolean isPlantableCrop(ItemStack stack) {
         return isPlantableSeed(stack);
+    }
+
+    /**
+     * Checks if the given ItemStack represents a sapling.
+     */
+    public static boolean isSapling(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
+        if (stack.is(ItemTags.SAPLINGS)) {
+            return true;
+        }
+        Item item = stack.getItem();
+        if (item instanceof BlockItem blockItem) {
+            return isSaplingBlock(blockItem.getBlock());
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a Block is a sapling or propagule.
+     */
+    public static boolean isSaplingBlock(Block block) {
+        if (block == null) {
+            return false;
+        }
+        if (block.defaultBlockState().is(BlockTags.SAPLINGS)) {
+            return true;
+        }
+        if (block instanceof SaplingBlock) {
+            return true;
+        }
+        String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("sapling") || id.contains("propagule");
+    }
+
+    /**
+     * Trees that STRICTLY require a 2x2 grid to grow (e.g. Dark Oak).
+     * Single 1x1 saplings will never grow in vanilla Minecraft.
+     */
+    public static boolean isStrictly2x2Sapling(Block block) {
+        if (block == Blocks.DARK_OAK_SAPLING) {
+            return true;
+        }
+        String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("dark_oak") || id.contains("pale_oak");
+    }
+
+    /**
+     * Trees that support 2x2 mega structures (Dark Oak, Spruce, Jungle, Redwood).
+     */
+    public static boolean isSupported2x2Sapling(Block block) {
+        if (isStrictly2x2Sapling(block)) {
+            return true;
+        }
+        if (block == Blocks.SPRUCE_SAPLING || block == Blocks.JUNGLE_SAPLING) {
+            return true;
+        }
+        String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("spruce") || id.contains("jungle") || id.contains("redwood");
+    }
+
+    /**
+     * Checks if plantPos is within minSpacing of any already existing sapling, tree trunk (logs),
+     * or foliage (leaves) in the world. Prevents overcrowding and repeat-planting saturation.
+     */
+    public static boolean isNearExistingTreeOrSapling(Level level, BlockPos plantPos, int minSpacing) {
+        int checkRadius = Math.max(1, minSpacing - 1);
+        for (int dx = -checkRadius; dx <= checkRadius; dx++) {
+            for (int dz = -checkRadius; dz <= checkRadius; dz++) {
+                for (int dy = -1; dy <= 5; dy++) {
+                    BlockPos checkPos = plantPos.offset(dx, dy, dz);
+                    if (checkPos.equals(plantPos)) {
+                        continue;
+                    }
+                    BlockState state = level.getBlockState(checkPos);
+                    if (state.isAir()) {
+                        continue;
+                    }
+                    if (isSaplingBlock(state.getBlock())) {
+                        return true;
+                    }
+                    if (state.is(BlockTags.LOGS) || state.is(BlockTags.LEAVES)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Deterministic, uniform spatial 32-bit hash based on SplitMix64.
+     */
+    public static int hashPos(int x, int z, long seed) {
+        long h = (long) x * 3129871L ^ (long) z * 116129781L ^ seed;
+        h = (h ^ (h >>> 30)) * 0xbf58476d1ce4e5b9L;
+        h = (h ^ (h >>> 27)) * 0x94d049bb133111ebL;
+        h = h ^ (h >>> 31);
+        return (int) (h ^ (h >>> 32));
+    }
+
+    private static boolean containsOrigin(BlockPos clusterOrigin, BlockPos originSoilPos) {
+        if (originSoilPos == null) {
+            return false;
+        }
+        int dx = originSoilPos.getX() - clusterOrigin.getX();
+        int dy = originSoilPos.getY() - clusterOrigin.getY();
+        int dz = originSoilPos.getZ() - clusterOrigin.getZ();
+        return dy == 0 && dx >= 0 && dx <= 1 && dz >= 0 && dz <= 1;
+    }
+
+    private static void add1x1SaplingsWithSpacing(Level level, List<BlockPos> soils, BlockPos originSoilPos,
+                                                  int minSpacing, long seed, Set<BlockPos> chosenSaplingPositions,
+                                                  List<BlockPos> result) {
+        List<BlockPos> candidates = new ArrayList<>(soils);
+        candidates.sort((a, b) -> {
+            boolean aIsOrigin = a.equals(originSoilPos);
+            boolean bIsOrigin = b.equals(originSoilPos);
+            if (aIsOrigin && !bIsOrigin) return -1;
+            if (!aIsOrigin && bIsOrigin) return 1;
+            return Integer.compare(hashPos(a.getX(), a.getZ(), seed), hashPos(b.getX(), b.getZ(), seed));
+        });
+
+        for (BlockPos soil : candidates) {
+            BlockPos above = soil.above();
+            BlockState aboveState = level.getBlockState(above);
+            if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
+                continue;
+            }
+            if (isNearExistingTreeOrSapling(level, above, minSpacing)) {
+                continue;
+            }
+
+            boolean spacingOk = true;
+            for (BlockPos chosen : chosenSaplingPositions) {
+                if (Math.max(Math.abs(above.getX() - chosen.getX()), Math.abs(above.getZ() - chosen.getZ())) < minSpacing) {
+                    spacingOk = false;
+                    break;
+                }
+            }
+
+            if (spacingOk) {
+                result.add(soil);
+                chosenSaplingPositions.add(above);
+            }
+        }
+    }
+
+    /**
+     * Filters candidate soil positions for smart sapling planting.
+     * Enforces minSpacing between trees, anti-overcrowding against existing trees/saplings,
+     * and 2x2 cluster alignment for Dark Oak, Spruce, and Jungle.
+     */
+    public static List<BlockPos> filterSmartSaplingPositions(Level level, List<BlockPos> candidateSoilList,
+                                                             ItemStack seedStack, BlockPos originSoilPos) {
+        if (!FarmingConfig.SMART_SAPLING_PLANTING.get() || !isSapling(seedStack) || candidateSoilList.isEmpty()) {
+            return candidateSoilList;
+        }
+
+        Item seedItem = seedStack.getItem();
+        if (!(seedItem instanceof BlockItem blockItem)) {
+            return candidateSoilList;
+        }
+        Block saplingBlock = blockItem.getBlock();
+
+        int minSpacing = FarmingConfig.SAPLING_MIN_SPACING.get();
+        boolean enable2x2 = FarmingConfig.SMART_SAPLING_2X2.get();
+        boolean isStrict2x2 = isStrictly2x2Sapling(saplingBlock);
+        boolean isSupported2x2 = isSupported2x2Sapling(saplingBlock);
+
+        long seed = (long) level.dimension().location().hashCode();
+
+        List<BlockPos> result = new ArrayList<>();
+        Set<BlockPos> chosenSaplingPositions = new HashSet<>();
+        Set<BlockPos> candidateSoilSet = new HashSet<>(candidateSoilList);
+
+        if ((isStrict2x2 || isSupported2x2) && enable2x2) {
+            // Find 2x2 clusters at same Y level
+            List<BlockPos> potentialClusterOrigins = new ArrayList<>();
+            for (BlockPos soil : candidateSoilList) {
+                BlockPos p0 = soil;
+                BlockPos p1 = soil.offset(1, 0, 0);
+                BlockPos p2 = soil.offset(0, 0, 1);
+                BlockPos p3 = soil.offset(1, 0, 1);
+
+                if (candidateSoilSet.contains(p1) && candidateSoilSet.contains(p2) && candidateSoilSet.contains(p3)) {
+                    boolean valid = true;
+                    for (BlockPos p : List.of(p0, p1, p2, p3)) {
+                        BlockPos above = p.above();
+                        BlockState aboveState = level.getBlockState(above);
+                        if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
+                            valid = false;
+                            break;
+                        }
+                        if (isNearExistingTreeOrSapling(level, above, minSpacing)) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    if (valid) {
+                        potentialClusterOrigins.add(soil);
+                    }
+                }
+            }
+
+            final long finalSeed = seed;
+            potentialClusterOrigins.sort((a, b) -> {
+                boolean aContainsOrigin = containsOrigin(a, originSoilPos);
+                boolean bContainsOrigin = containsOrigin(b, originSoilPos);
+                if (aContainsOrigin && !bContainsOrigin) return -1;
+                if (!aContainsOrigin && bContainsOrigin) return 1;
+                return Integer.compare(hashPos(a.getX(), a.getZ(), finalSeed), hashPos(b.getX(), b.getZ(), finalSeed));
+            });
+
+            Set<BlockPos> usedSoilPositions = new HashSet<>();
+            for (BlockPos origin : potentialClusterOrigins) {
+                BlockPos p0 = origin;
+                BlockPos p1 = origin.offset(1, 0, 0);
+                BlockPos p2 = origin.offset(0, 0, 1);
+                BlockPos p3 = origin.offset(1, 0, 1);
+                List<BlockPos> clusterSoils = List.of(p0, p1, p2, p3);
+
+                if (clusterSoils.stream().anyMatch(usedSoilPositions::contains)) {
+                    continue;
+                }
+
+                boolean spacingOk = true;
+                for (BlockPos p : clusterSoils) {
+                    BlockPos above = p.above();
+                    for (BlockPos chosen : chosenSaplingPositions) {
+                        if (Math.max(Math.abs(above.getX() - chosen.getX()), Math.abs(above.getZ() - chosen.getZ())) < minSpacing) {
+                            spacingOk = false;
+                            break;
+                        }
+                    }
+                    if (!spacingOk) break;
+                }
+
+                if (spacingOk) {
+                    usedSoilPositions.addAll(clusterSoils);
+                    result.addAll(clusterSoils);
+                    for (BlockPos p : clusterSoils) {
+                        chosenSaplingPositions.add(p.above());
+                    }
+                }
+            }
+
+            // Strictly 2x2 saplings (Dark Oak) cannot grow on 1x1, so only 2x2 clusters are planted
+            if (isStrict2x2) {
+                return result;
+            }
+
+            // Supported 2x2 (Spruce, Jungle): leftover candidate soils can be planted as spaced 1x1 saplings
+            List<BlockPos> remainingSoils = new ArrayList<>();
+            for (BlockPos soil : candidateSoilList) {
+                if (!usedSoilPositions.contains(soil)) {
+                    remainingSoils.add(soil);
+                }
+            }
+            add1x1SaplingsWithSpacing(level, remainingSoils, originSoilPos, minSpacing, finalSeed, chosenSaplingPositions, result);
+            return result;
+        }
+
+        // Standard 1x1 saplings (Oak, Birch, Acacia, Cherry, Mangrove, etc.)
+        add1x1SaplingsWithSpacing(level, candidateSoilList, originSoilPos, minSpacing, seed, chosenSaplingPositions, result);
+        return result;
     }
 
     /**
@@ -574,6 +843,10 @@ public class FarmingManager {
         List<BlockPos> sorted = selected.stream()
                 .sorted(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)))
                 .toList();
+
+        if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
+            sorted = filterSmartSaplingPositions(level, sorted, seedStack, originSoilPos);
+        }
 
         int maxLimit = getEffectiveBlockLimit(player);
         float exhaustion = getFoodExhaustion(player);
@@ -1423,6 +1696,7 @@ public class FarmingManager {
 
         boolean isSoulSandTarget = isSoulSand(startState);
         boolean isFarmlandTarget = isFarmland(startState);
+        boolean isSoilTarget = isValidSoilForSeed(seedStack, startState, level, actualSoil);
 
         queue.add(actualSoil);
         visited.add(actualSoil);
@@ -1455,6 +1729,10 @@ public class FarmingManager {
                             matches = true;
                         } else if (isFarmlandTarget && isFarmland(nextState)) {
                             matches = true;
+                        } else if (isSoilTarget && isValidSoilForSeed(seedStack, nextState, level, next)) {
+                            if (nextState.is(startState.getBlock()) || (startState.is(BlockTags.DIRT) && nextState.is(BlockTags.DIRT))) {
+                                matches = true;
+                            }
                         }
 
                         if (matches) {
@@ -1465,6 +1743,11 @@ public class FarmingManager {
                 }
             }
         }
+
+        if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
+            result = filterSmartSaplingPositions(level, result, seedStack, actualSoil);
+        }
+
         return result;
     }
 

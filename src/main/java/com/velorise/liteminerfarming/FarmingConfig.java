@@ -20,6 +20,9 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue COLLECT_DROPS_AT_TARGET;
     public static final ModConfigSpec.BooleanValue HARVEST_SUGAR_CANE;
     public static final ModConfigSpec.BooleanValue STANDALONE_PREVIEW;
+    public static final ModConfigSpec.BooleanValue SMART_SAPLING_PLANTING;
+    public static final ModConfigSpec.IntValue SAPLING_MIN_SPACING;
+    public static final ModConfigSpec.BooleanValue SMART_SAPLING_2X2;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -89,6 +92,18 @@ public class FarmingConfig {
         STANDALONE_PREVIEW = builder
                 .comment("Enable client-side highlight wireframe preview when LiteMiner is not installed.")
                 .define("standalone_preview", true);
+
+        SMART_SAPLING_PLANTING = builder
+                .comment("Enable smart spacing and natural density when mass planting saplings (applies to saplings only, default off).")
+                .define("smart_sapling_planting", false);
+
+        SAPLING_MIN_SPACING = builder
+                .comment("Minimum horizontal spacing in blocks between planted saplings in smart planting mode.")
+                .defineInRange("sapling_min_spacing", 3, 1, 10);
+
+        SMART_SAPLING_2X2 = builder
+                .comment("Automatically plant in 2x2 clusters for trees that support or require 2x2 grids (Dark Oak, Spruce, Jungle).")
+                .define("smart_sapling_2x2", true);
 
         builder.pop();
         SPEC = builder.build();
