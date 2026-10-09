@@ -295,13 +295,7 @@ public class FarmingManager {
                                                   int minSpacing, long seed, Set<BlockPos> chosenSaplingPositions,
                                                   List<BlockPos> result) {
         List<BlockPos> candidates = new ArrayList<>(soils);
-        candidates.sort((a, b) -> {
-            boolean aIsOrigin = a.equals(originSoilPos);
-            boolean bIsOrigin = b.equals(originSoilPos);
-            if (aIsOrigin && !bIsOrigin) return -1;
-            if (!aIsOrigin && bIsOrigin) return 1;
-            return Integer.compare(hashPos(a.getX(), a.getZ(), seed), hashPos(b.getX(), b.getZ(), seed));
-        });
+        candidates.sort(Comparator.comparingInt(p -> hashPos(p.getX(), p.getZ(), seed)));
 
         for (BlockPos soil : candidates) {
             BlockPos above = soil.above();
@@ -429,6 +423,9 @@ public class FarmingManager {
 
             // Strictly 2x2 saplings (Dark Oak) cannot grow on 1x1, so only 2x2 clusters are planted
             if (isStrict2x2) {
+                if (result.size() < 4) {
+                    return Collections.emptyList();
+                }
                 return result;
             }
 
@@ -440,11 +437,17 @@ public class FarmingManager {
                 }
             }
             add1x1SaplingsWithSpacing(level, remainingSoils, originSoilPos, minSpacing, finalSeed, chosenSaplingPositions, result);
+            if (result.size() < 2) {
+                return Collections.emptyList();
+            }
             return result;
         }
 
         // Standard 1x1 saplings (Oak, Birch, Acacia, Cherry, Mangrove, etc.)
         add1x1SaplingsWithSpacing(level, candidateSoilList, originSoilPos, minSpacing, seed, chosenSaplingPositions, result);
+        if (result.size() < 2) {
+            return Collections.emptyList();
+        }
         return result;
     }
 
@@ -956,6 +959,9 @@ public class FarmingManager {
 
         if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
             sorted = filterSmartSaplingPositions(level, sorted, seedStack, originSoilPos);
+            if (sorted == null || sorted.isEmpty()) {
+                return false;
+            }
         }
 
         int maxLimit = getEffectiveBlockLimit(player);
