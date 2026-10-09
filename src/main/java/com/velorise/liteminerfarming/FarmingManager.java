@@ -24,6 +24,8 @@ import net.minecraft.world.level.block.BonemealableBlock;
 import net.minecraft.world.level.block.BushBlock;
 import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.CropBlock;
+import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.StemBlock;
@@ -59,7 +61,10 @@ public class FarmingManager {
      * Universal farmland check supporting vanilla and modded farmlands (e.g. Farmer's Delight Rich Soil Farmland).
      */
     public static boolean isFarmland(BlockState state) {
-        if (state.is(Blocks.FARMLAND)) {
+        if (state == null) {
+            return false;
+        }
+        if (state.is(Blocks.FARMLAND) || state.getBlock() instanceof FarmBlock) {
             return true;
         }
         String descriptionId = state.getBlock().getDescriptionId().toLowerCase(Locale.ROOT);
@@ -192,16 +197,19 @@ public class FarmingManager {
             // Safe foliage clearing: never break existing valuable crops (CropBlock or StemBlock)!
             boolean isValuableCrop = aboveState.getBlock() instanceof CropBlock || aboveState.getBlock() instanceof StemBlock;
 
-            if (clearFoliage && !aboveState.isAir() && !isValuableCrop && (aboveState.canBeReplaced() || aboveState.is(BlockTags.REPLACEABLE_BY_TREES) || aboveState.is(BlockTags.FLOWERS))) {
+            if (clearFoliage && !aboveState.isAir() && !isValuableCrop && (aboveState.canBeReplaced() || aboveState.is(BlockTags.REPLACEABLE_BY_TREES) || aboveState.is(BlockTags.FLOWERS) || (aboveState.getBlock() instanceof BushBlock && !isValuableCrop))) {
                 level.destroyBlock(above, true, player);
                 aboveState = level.getBlockState(above);
             }
 
             if (aboveState.isAir()) {
-                UseOnContext context = new UseOnContext(player, hand, new BlockHitResult(
+                BlockHitResult hitResult = new BlockHitResult(
                         Vec3.atCenterOf(pos).add(0, 0.5, 0), Direction.UP, pos, false
-                ));
+                );
+                UseOnContext context = new UseOnContext(player, hand, hitResult);
                 BlockState tilledState = currentState.getToolModifiedState(context, ItemAbilities.HOE_TILL, false);
+                boolean tilled = false;
+
                 if (tilledState != null) {
                     level.setBlock(pos, tilledState, 11);
                     level.gameEvent(player, GameEvent.BLOCK_CHANGE, pos);
@@ -209,7 +217,27 @@ public class FarmingManager {
                     if (!player.isCreative()) {
                         hoeStack.hurtAndBreak(1, player, hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
                     }
+                    tilled = true;
+                } else {
+                    // Fallback for modded blocks (such as Regions Unexplored RUGrassBlock / RUDirtBlock)
+                    // that implement hoe tilling inside useItemOn rather than getToolModifiedState
+                    int prevDamage = hoeStack.getDamageValue();
+                    int prevCount = hoeStack.getCount();
+                    ItemInteractionResult result = currentState.useItemOn(hoeStack, level, player, hand, hitResult);
+                    if (result.consumesAction()) {
+                        tilled = true;
+                        if (player.isCreative()) {
+                            if (hoeStack.getDamageValue() != prevDamage) {
+                                hoeStack.setDamageValue(prevDamage);
+                            }
+                            if (hoeStack.getCount() != prevCount) {
+                                hoeStack.setCount(prevCount);
+                            }
+                        }
+                    }
+                }
 
+                if (tilled) {
                     if (tilledCount % 4 == 0) {
                         level.playSound(null, pos, SoundEvents.HOE_TILL, SoundSource.BLOCKS, 1.0F, 1.0F);
                     }
@@ -763,7 +791,14 @@ public class FarmingManager {
         UseOnContext context = new UseOnContext(player, hand, new BlockHitResult(
                 Vec3.atCenterOf(pos).add(0, 0.5, 0), Direction.UP, pos, false
         ));
-        return state.getToolModifiedState(context, ItemAbilities.HOE_TILL, false) != null;
+        if (state.getToolModifiedState(context, ItemAbilities.HOE_TILL, false) != null) {
+            return true;
+        }
+        if (state.is(BlockTags.DIRT)) {
+            return true;
+        }
+        String id = state.getBlock().getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("dirt") || id.contains("grass") || id.contains("soil");
     }
 
     public static boolean consumeSeed(Player player, InteractionHand hand, Item seedItem) {
