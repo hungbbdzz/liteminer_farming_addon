@@ -31,6 +31,24 @@ import java.util.Collections;
 
 public class StandaloneHighlightRenderer {
 
+    private BlockPos lastClickedPos = null;
+    private BlockState lastClickedState = null;
+    private ItemStack lastHeldItem = ItemStack.EMPTY;
+    private long lastCacheTime = 0L;
+    private Collection<BlockPos> cachedPreviewBlocks = Collections.emptyList();
+    private float cachedR = 1.0f, cachedG = 0.82f, cachedB = 0.2f, cachedA = 0.8f;
+    private boolean cachedIsPlanting = false;
+    private BlockState cachedGhostPlantState = null;
+
+    private void clearCache() {
+        lastClickedPos = null;
+        lastClickedState = null;
+        lastHeldItem = ItemStack.EMPTY;
+        lastCacheTime = 0L;
+        cachedPreviewBlocks = Collections.emptyList();
+        cachedGhostPlantState = null;
+    }
+
     @SubscribeEvent
     public void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
@@ -50,6 +68,7 @@ public class StandaloneHighlightRenderer {
         Player player = mc.player;
         Level level = mc.level;
         if (player == null || level == null) {
+            clearCache();
             return;
         }
 
@@ -65,11 +84,13 @@ public class StandaloneHighlightRenderer {
         }
 
         if (!active) {
+            clearCache();
             return;
         }
 
         HitResult hit = mc.hitResult;
         if (!(hit instanceof BlockHitResult blockHit) || hit.getType() != HitResult.Type.BLOCK) {
+            clearCache();
             return;
         }
 
@@ -78,31 +99,66 @@ public class StandaloneHighlightRenderer {
         ItemStack heldItem = player.getMainHandItem();
         InteractionHand hand = InteractionHand.MAIN_HAND;
 
-        // Determine preview blocks and action color
-        Collection<BlockPos> previewBlocks = Collections.emptyList();
-        float r = 1.0f, g = 0.82f, b = 0.2f, a = 0.8f; // Default golden harvest
+        // Check if cached search result is still valid (throttle search to at most once per 250ms when looking at same block)
+        long now = System.currentTimeMillis();
+        boolean cacheValid = lastClickedPos != null
+                && lastClickedPos.equals(clickedPos)
+                && clickedState.equals(lastClickedState)
+                && ItemStack.matches(heldItem, lastHeldItem)
+                && (now - lastCacheTime < 250);
 
-        if (FarmingEventHandler.isHoe(heldItem) && FarmingManager.isTillable(level, player, hand, clickedPos)) {
-            previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
-            r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
-        } else if (FarmingManager.isPlantableSeed(heldItem) && (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) || FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()))) {
-            previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos, heldItem);
-            r = 0.4f; g = 0.85f; b = 0.3f; // Sprout Green
-        } else if (heldItem.is(Items.BONE_MEAL)) {
-            if (FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
-                    || FarmingManager.isBonemealCrop(clickedState)
-                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))) {
-                previewBlocks = FarmingManager.fallbackCropSearch(level, clickedPos);
-                r = 0.3f; g = 0.9f; b = 0.4f; // Emerald Jade
-            }
+        Collection<BlockPos> previewBlocks;
+        float r, g, b, a;
+        boolean isPlanting;
+        BlockState ghostPlantState;
+
+        if (cacheValid) {
+            previewBlocks = cachedPreviewBlocks;
+            r = cachedR; g = cachedG; b = cachedB; a = cachedA;
+            isPlanting = cachedIsPlanting;
+            ghostPlantState = cachedGhostPlantState;
         } else {
-            // Harvest
-            BlockPos targetCrop = (FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState)) ? clickedPos : clickedPos.above();
-            if (FarmingManager.isCrop(level.getBlockState(targetCrop)) || FarmingManager.isColumnCrop(level.getBlockState(targetCrop))
-                    || FarmingManager.isFruitCrop(clickedState) || FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState)) {
-                previewBlocks = FarmingManager.fallbackHarvestSearch(level, targetCrop);
-                r = 1.0f; g = 0.82f; b = 0.2f; // Golden Autumn Harvest
+            previewBlocks = Collections.emptyList();
+            r = 1.0f; g = 0.82f; b = 0.2f; a = 0.8f; // Default golden harvest
+            isPlanting = false;
+            ghostPlantState = null;
+
+            if (FarmingEventHandler.isHoe(heldItem) && FarmingManager.isTillable(level, player, hand, clickedPos)) {
+                previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
+                r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
+            } else if (FarmingManager.isPlantableSeed(heldItem) && (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) || FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()))) {
+                previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos, heldItem);
+                r = 0.4f; g = 0.85f; b = 0.3f; // Sprout Green
+                isPlanting = true;
+                if (FarmingConfig.GHOST_PLANT_PREVIEW.get()) {
+                    ghostPlantState = getPlantedBlockState(heldItem);
+                }
+            } else if (heldItem.is(Items.BONE_MEAL)) {
+                if (FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
+                        || FarmingManager.isBonemealCrop(clickedState)
+                        || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))) {
+                    previewBlocks = FarmingManager.fallbackCropSearch(level, clickedPos);
+                    r = 0.3f; g = 0.9f; b = 0.4f; // Emerald Jade
+                }
+            } else {
+                // Harvest
+                BlockPos targetCrop = (FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState)) ? clickedPos : clickedPos.above();
+                if (FarmingManager.isCrop(level.getBlockState(targetCrop)) || FarmingManager.isColumnCrop(level.getBlockState(targetCrop))
+                        || FarmingManager.isFruitCrop(clickedState) || FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState)) {
+                    previewBlocks = FarmingManager.fallbackHarvestSearch(level, targetCrop);
+                    r = 1.0f; g = 0.82f; b = 0.2f; // Golden Autumn Harvest
+                }
             }
+
+            // Update cache
+            lastClickedPos = clickedPos;
+            lastClickedState = clickedState;
+            lastHeldItem = heldItem.copy();
+            lastCacheTime = now;
+            cachedPreviewBlocks = previewBlocks;
+            cachedR = r; cachedG = g; cachedB = b; cachedA = a;
+            cachedIsPlanting = isPlanting;
+            cachedGhostPlantState = ghostPlantState;
         }
 
         if (previewBlocks == null || previewBlocks.isEmpty()) {
@@ -117,20 +173,20 @@ public class StandaloneHighlightRenderer {
 
         poseStack.pushPose();
 
-        boolean isPlanting = (r == 0.4f && g == 0.85f);
-        BlockState ghostPlantState = isPlanting && FarmingConfig.GHOST_PLANT_PREVIEW.get()
-                ? getPlantedBlockState(heldItem)
-                : null;
-
+        float lineAlpha = (isPlanting && ghostPlantState != null) ? 0.35f : a;
         for (BlockPos pos : previewBlocks) {
             BlockPos renderPos = isPlanting ? pos.above() : pos;
-            BlockState state = level.getBlockState(renderPos);
-            VoxelShape shape = state.getShape(level, renderPos);
-            net.minecraft.world.phys.AABB aabb = shape.isEmpty()
-                    ? new net.minecraft.world.phys.AABB(renderPos)
-                    : shape.bounds().move(renderPos);
+            net.minecraft.world.phys.AABB aabb;
+            if (isPlanting) {
+                aabb = new net.minecraft.world.phys.AABB(renderPos);
+            } else {
+                BlockState state = level.getBlockState(renderPos);
+                VoxelShape shape = state.getShape(level, renderPos);
+                aabb = shape.isEmpty()
+                        ? new net.minecraft.world.phys.AABB(renderPos)
+                        : shape.bounds().move(renderPos);
+            }
             net.minecraft.world.phys.AABB camRelative = aabb.move(-camPos.x, -camPos.y, -camPos.z);
-            float lineAlpha = (isPlanting && ghostPlantState != null) ? 0.35f : a;
             LevelRenderer.renderLineBox(poseStack, consumer, camRelative, r, g, b, lineAlpha);
         }
 
@@ -139,7 +195,10 @@ public class StandaloneHighlightRenderer {
 
         // Render faded ghost block preview of the exact plant/sapling
         if (ghostPlantState != null && !previewBlocks.isEmpty()) {
-            MultiBufferSource fadedBuffer = type -> new FadedVertexConsumer(bufferSource.getBuffer(RenderType.translucent()), 0.45f);
+            VertexConsumer translucentConsumer = bufferSource.getBuffer(RenderType.translucent());
+            FadedVertexConsumer fadedConsumer = new FadedVertexConsumer(translucentConsumer, 0.45f);
+            MultiBufferSource fadedBuffer = type -> fadedConsumer;
+
             for (BlockPos pos : previewBlocks) {
                 BlockPos plantPos = pos.above();
                 poseStack.pushPose();

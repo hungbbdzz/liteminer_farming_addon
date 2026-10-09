@@ -241,24 +241,32 @@ public class FarmingManager {
         return cached;
     }
 
+    private static final int[] DY_ORDER = {0, 1, -1, 2, 3, 4, 5};
+
     /**
      * Checks if plantPos is within minSpacing of any already existing sapling, tree trunk (logs),
      * or foliage (leaves) in the world. Prevents overcrowding and repeat-planting saturation.
      */
     public static boolean isNearExistingTreeOrSapling(Level level, BlockPos plantPos, int minSpacing) {
         int checkRadius = Math.max(1, minSpacing - 1);
-        for (int dx = -checkRadius; dx <= checkRadius; dx++) {
-            for (int dz = -checkRadius; dz <= checkRadius; dz++) {
-                for (int dy = -1; dy <= 5; dy++) {
-                    BlockPos checkPos = plantPos.offset(dx, dy, dz);
-                    if (checkPos.equals(plantPos)) {
+        BlockPos.MutableBlockPos mPos = new BlockPos.MutableBlockPos();
+        int px = plantPos.getX();
+        int py = plantPos.getY();
+        int pz = plantPos.getZ();
+
+        for (int dy : DY_ORDER) {
+            for (int dx = -checkRadius; dx <= checkRadius; dx++) {
+                for (int dz = -checkRadius; dz <= checkRadius; dz++) {
+                    if (dx == 0 && dz == 0 && dy == 0) {
                         continue;
                     }
-                    BlockState state = level.getBlockState(checkPos);
+                    mPos.set(px + dx, py + dy, pz + dz);
+                    BlockState state = level.getBlockState(mPos);
                     if (state.isAir()) {
                         continue;
                     }
-                    if (isSaplingBlock(state.getBlock())) {
+                    if (state.is(BlockTags.SAPLINGS) || state.is(C_BLOCK_SAPLINGS) || state.is(FORGE_BLOCK_SAPLINGS)
+                            || state.getBlock() instanceof SaplingBlock) {
                         return true;
                     }
                     if (state.is(BlockTags.LOGS) || state.is(BlockTags.LEAVES)) {
@@ -293,7 +301,7 @@ public class FarmingManager {
 
     private static void add1x1SaplingsWithSpacing(Level level, List<BlockPos> soils, BlockPos originSoilPos,
                                                   int minSpacing, long seed, Set<BlockPos> chosenSaplingPositions,
-                                                  List<BlockPos> result) {
+                                                  List<BlockPos> result, Map<BlockPos, Boolean> nearCache) {
         List<BlockPos> candidates = new ArrayList<>(soils);
         candidates.sort(Comparator.comparingInt(p -> hashPos(p.getX(), p.getZ(), seed)));
 
@@ -303,7 +311,8 @@ public class FarmingManager {
             if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
                 continue;
             }
-            if (isNearExistingTreeOrSapling(level, above, minSpacing)) {
+            boolean near = nearCache.computeIfAbsent(above, p -> isNearExistingTreeOrSapling(level, p, minSpacing));
+            if (near) {
                 continue;
             }
 
@@ -349,6 +358,7 @@ public class FarmingManager {
         List<BlockPos> result = new ArrayList<>();
         Set<BlockPos> chosenSaplingPositions = new HashSet<>();
         Set<BlockPos> candidateSoilSet = new HashSet<>(candidateSoilList);
+        Map<BlockPos, Boolean> nearCache = new HashMap<>();
 
         if ((isStrict2x2 || isSupported2x2) && enable2x2) {
             // Find 2x2 clusters at same Y level
@@ -368,7 +378,8 @@ public class FarmingManager {
                             valid = false;
                             break;
                         }
-                        if (isNearExistingTreeOrSapling(level, above, minSpacing)) {
+                        boolean near = nearCache.computeIfAbsent(above, pos -> isNearExistingTreeOrSapling(level, pos, minSpacing));
+                        if (near) {
                             valid = false;
                             break;
                         }
@@ -436,7 +447,7 @@ public class FarmingManager {
                     remainingSoils.add(soil);
                 }
             }
-            add1x1SaplingsWithSpacing(level, remainingSoils, originSoilPos, minSpacing, finalSeed, chosenSaplingPositions, result);
+            add1x1SaplingsWithSpacing(level, remainingSoils, originSoilPos, minSpacing, finalSeed, chosenSaplingPositions, result, nearCache);
             if (result.size() < 2) {
                 return Collections.emptyList();
             }
@@ -444,7 +455,7 @@ public class FarmingManager {
         }
 
         // Standard 1x1 saplings (Oak, Birch, Acacia, Cherry, Mangrove, etc.)
-        add1x1SaplingsWithSpacing(level, candidateSoilList, originSoilPos, minSpacing, seed, chosenSaplingPositions, result);
+        add1x1SaplingsWithSpacing(level, candidateSoilList, originSoilPos, minSpacing, seed, chosenSaplingPositions, result, nearCache);
         if (result.size() < 2) {
             return Collections.emptyList();
         }
