@@ -931,6 +931,16 @@ public class FarmingManager {
     }
 
     /**
+     * Determines whether a block position belongs to the primary crop row or alternating crop row
+     * for smart intercropping. Rows run parallel to the player's view direction.
+     */
+    public static boolean isMainCropRow(BlockPos pos, BlockPos originPos, Direction facing) {
+        boolean alternateOnX = (facing.getAxis() == Direction.Axis.Z);
+        int rowCoord = alternateOnX ? (pos.getX() - originPos.getX()) : (pos.getZ() - originPos.getZ());
+        return Math.floorMod(rowCoord, 2) == 0;
+    }
+
+    /**
      * Handles mass planting using positions strictly defined by LiteMiner's Walker.
      */
     public static boolean handleMassPlanting(ServerPlayer player, InteractionHand hand, ItemStack seedStack, BlockPos clickedPos) {
@@ -978,6 +988,20 @@ public class FarmingManager {
         int maxLimit = getEffectiveBlockLimit(player);
         float exhaustion = getFoodExhaustion(player);
 
+        ItemStack offHandStack = player.getItemInHand(InteractionHand.OFF_HAND);
+        boolean isIntercropping = FarmingConfig.SMART_INTERCROPPING.get()
+                && isPlantableSeed(seedStack)
+                && isPlantableSeed(offHandStack)
+                && !seedStack.is(offHandStack.getItem())
+                && !isSapling(seedStack) && !isSapling(offHandStack);
+
+        Direction facing = player.getDirection();
+        Item mainSeedItem = seedItem;
+        Block mainCropBlock = cropBlock;
+
+        Item offSeedItem = isIntercropping ? offHandStack.getItem() : null;
+        Block offCropBlock = (offSeedItem instanceof BlockItem bi) ? bi.getBlock() : null;
+
         int plantedCount = 0;
         SoundType cropSound = null;
 
@@ -986,8 +1010,18 @@ public class FarmingManager {
                 break;
             }
 
+            boolean useMainCrop = true;
+            if (isIntercropping && offCropBlock != null) {
+                useMainCrop = isMainCropRow(soilPos, originSoilPos, facing);
+            }
+
+            Item currentSeedItem = useMainCrop ? mainSeedItem : offSeedItem;
+            Block currentCropBlock = useMainCrop ? mainCropBlock : offCropBlock;
+            InteractionHand currentHand = useMainCrop ? hand : InteractionHand.OFF_HAND;
+            ItemStack currentSeedStack = useMainCrop ? seedStack : offHandStack;
+
             BlockState soilState = level.getBlockState(soilPos);
-            if (!isValidSoilForSeed(seedStack, soilState, level, soilPos)) {
+            if (!isValidSoilForSeed(currentSeedStack, soilState, level, soilPos)) {
                 continue;
             }
 
@@ -996,15 +1030,15 @@ public class FarmingManager {
 
             if (aboveState.isAir() || aboveState.canBeReplaced()) {
                 BlockPlaceContext placeContext = new BlockPlaceContext(new UseOnContext(
-                        player, hand, new BlockHitResult(Vec3.atCenterOf(above), Direction.UP, soilPos, false)
+                        player, currentHand, new BlockHitResult(Vec3.atCenterOf(above), Direction.UP, soilPos, false)
                 ));
-                BlockState placeState = cropBlock.getStateForPlacement(placeContext);
+                BlockState placeState = currentCropBlock.getStateForPlacement(placeContext);
                 if (placeState == null) {
-                    placeState = cropBlock.defaultBlockState();
+                    placeState = currentCropBlock.defaultBlockState();
                 }
 
                 if (placeState.canSurvive(level, above)) {
-                    if (consumeSeed(player, hand, seedItem)) {
+                    if (consumeSeed(player, currentHand, currentSeedItem)) {
                         level.setBlock(above, placeState, 3);
                         level.gameEvent(player, GameEvent.BLOCK_PLACE, above);
 
@@ -1018,8 +1052,8 @@ public class FarmingManager {
                         if (!player.isCreative() && exhaustion > 0) {
                             player.causeFoodExhaustion(exhaustion);
                         }
-                    } else {
-                        // Out of seeds! Stop planting
+                    } else if (!isIntercropping) {
+                        // Out of seeds! Stop planting in single crop mode
                         break;
                     }
                 }
@@ -1189,6 +1223,7 @@ public class FarmingManager {
         boolean replant = FarmingConfig.REPLANT_CROPS.get();
         boolean damageHoe = FarmingConfig.DAMAGE_HOE_ON_HARVEST.get();
         boolean collectAtTarget = FarmingConfig.COLLECT_DROPS_AT_TARGET.get();
+        boolean harvestToInventory = FarmingConfig.HARVEST_TO_INVENTORY.get();
         boolean allowColumnCrops = FarmingConfig.HARVEST_SUGAR_CANE.get();
         float exhaustion = getFoodExhaustion(player);
 
@@ -1246,7 +1281,7 @@ public class FarmingManager {
                                 stalkDrops.add(new ItemStack(stalkState.getBlock().asItem()));
                             }
 
-                            if (collectAtTarget) {
+                            if (collectAtTarget || harvestToInventory) {
                                 allDrops.addAll(stalkDrops);
                             } else {
                                 for (ItemStack drop : stalkDrops) {
@@ -1272,7 +1307,7 @@ public class FarmingManager {
             if (isFruitCrop(curState)) {
                 lastSoundType = curState.getSoundType(serverLevel, pos, player);
                 List<ItemStack> fruitDrops = new ArrayList<>(Block.getDrops(curState, serverLevel, pos, null, player, heldItem));
-                if (collectAtTarget) {
+                if (collectAtTarget || harvestToInventory) {
                     allDrops.addAll(fruitDrops);
                 } else {
                     for (ItemStack drop : fruitDrops) {
@@ -1336,7 +1371,7 @@ public class FarmingManager {
                         }
                     }
 
-                    if (collectAtTarget) {
+                    if (collectAtTarget || harvestToInventory) {
                         allDrops.addAll(pitcherDrops);
                     } else {
                         for (ItemStack drop : pitcherDrops) {
@@ -1377,7 +1412,7 @@ public class FarmingManager {
                     serverLevel.setBlock(cropPos, resetVines, 2);
                     serverLevel.gameEvent(player, GameEvent.BLOCK_CHANGE, cropPos);
                     ItemStack berryDrop = new ItemStack(Items.GLOW_BERRIES, 1);
-                    if (collectAtTarget) {
+                    if (collectAtTarget || harvestToInventory) {
                         allDrops.add(berryDrop);
                     } else {
                         Block.popResource(serverLevel, cropPos, berryDrop);
@@ -1398,7 +1433,7 @@ public class FarmingManager {
                 serverLevel.gameEvent(player, GameEvent.BLOCK_CHANGE, cropPos);
 
                 ItemStack berryDrop = new ItemStack(Items.SWEET_BERRIES, berryCount);
-                if (collectAtTarget) {
+                if (collectAtTarget || harvestToInventory) {
                     allDrops.add(berryDrop);
                 } else {
                     Block.popResource(serverLevel, cropPos, berryDrop);
@@ -1455,7 +1490,7 @@ public class FarmingManager {
             }
 
             // Drop items
-            if (collectAtTarget) {
+            if (collectAtTarget || harvestToInventory) {
                 allDrops.addAll(drops);
             } else {
                 for (ItemStack drop : drops) {
@@ -1475,7 +1510,18 @@ public class FarmingManager {
         }
 
         if (harvestedCount > 0) {
-            if (collectAtTarget && !allDrops.isEmpty()) {
+            if (harvestToInventory && !allDrops.isEmpty()) {
+                List<ItemStack> mergedDrops = mergeItemStacks(allDrops);
+                for (ItemStack drop : mergedDrops) {
+                    if (drop.isEmpty()) continue;
+                    boolean added = player.getInventory().add(drop);
+                    if (!added || !drop.isEmpty()) {
+                        // Inventory full: drop overflow at target position
+                        Block.popResource(serverLevel, clickedCropPos, drop);
+                    }
+                }
+                player.containerMenu.broadcastChanges();
+            } else if (collectAtTarget && !allDrops.isEmpty()) {
                 List<ItemStack> mergedDrops = mergeItemStacks(allDrops);
                 for (ItemStack drop : mergedDrops) {
                     if (!drop.isEmpty()) {

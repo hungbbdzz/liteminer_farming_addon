@@ -24,6 +24,8 @@ public class FarmingConfig {
     public static final ModConfigSpec.IntValue SAPLING_MIN_SPACING;
     public static final ModConfigSpec.BooleanValue SMART_SAPLING_2X2;
     public static final ModConfigSpec.BooleanValue GHOST_PLANT_PREVIEW;
+    public static final ModConfigSpec.BooleanValue HARVEST_TO_INVENTORY;
+    public static final ModConfigSpec.BooleanValue SMART_INTERCROPPING;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -86,6 +88,10 @@ public class FarmingConfig {
                 .comment("Gather all harvested item drops at the targeted block position instead of dropping them at each crop position.")
                 .define("collect_drops_at_target", true);
 
+        HARVEST_TO_INVENTORY = builder
+                .comment("Send harvested items directly into the player's inventory instead of dropping them on the ground (overflow drops on ground).")
+                .define("harvest_to_inventory", false);
+
         HARVEST_SUGAR_CANE = builder
                 .comment("Enable mass harvesting of sugar cane and column crops, preserving the bottom root block.")
                 .define("harvest_sugar_cane", true);
@@ -109,6 +115,10 @@ public class FarmingConfig {
         GHOST_PLANT_PREVIEW = builder
                 .comment("Display a faded translucent ghost preview of the sapling or plant at each valid planting location.")
                 .define("ghost_plant_preview", true);
+
+        SMART_INTERCROPPING = builder
+                .comment("When holding different crop seeds in both hands, automatically plant them in alternating parallel rows for optimal vanilla growth speed.")
+                .define("smart_intercropping", true);
 
         builder.pop();
         SPEC = builder.build();

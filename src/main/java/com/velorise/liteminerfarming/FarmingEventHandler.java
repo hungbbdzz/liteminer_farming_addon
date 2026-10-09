@@ -134,9 +134,11 @@ public class FarmingEventHandler {
 
         // 1. Mass Harvesting (AOE Harvest & Replant)
         if (!heldItem.is(Items.BONE_MEAL)) {
-            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState);
+            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState);
             boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState);
-            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()));
+            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
+                    || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
+                    || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()));
 
             // If player clicks empty soil while holding seeds, prioritize mass planting over harvesting
             boolean plantingOnEmptySoil = isSoil && level.getBlockState(clickedPos.above()).isAir() && FarmingManager.isPlantableSeed(heldItem);
@@ -199,9 +201,11 @@ public class FarmingEventHandler {
             }
 
             // If bone meal could not fertilize anything (all mature), harvest them
-            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState);
+            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState);
             boolean isFarmland = FarmingManager.isFarmland(clickedState);
-            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()));
+            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
+                    || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
+                    || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()));
             if (isDirectCrop || isFarmland || isAboveCrop) {
                 BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
                 boolean harvestHandled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
@@ -229,9 +233,11 @@ public class FarmingEventHandler {
                 return true;
             }
         }
-        boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState);
+        boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState);
         boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState);
-        boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above())) || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()));
+        boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
+                || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
+                || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()));
         return isDirectCrop || isSoil || isAboveCrop;
     }
 
