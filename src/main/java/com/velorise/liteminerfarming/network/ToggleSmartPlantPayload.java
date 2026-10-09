@@ -26,3 +26,4 @@ public record ToggleSmartPlantPayload(boolean enabled) implements CustomPacketPa
         return TYPE;
     }
 }
+

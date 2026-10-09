@@ -29,6 +29,7 @@ import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.FarmBlock;
+import net.minecraft.world.level.block.FlowerBlock;
 import net.minecraft.world.level.block.FungusBlock;
 import net.minecraft.world.level.block.KelpBlock;
 import net.minecraft.world.level.block.KelpPlantBlock;
@@ -150,7 +151,24 @@ public class PlantClassifier {
         if (state == null || state.isAir()) {
             return false;
         }
-        return state.is(BlockTags.FLOWERS);
+        return state.is(BlockTags.FLOWERS) || state.getBlock() instanceof FlowerBlock;
+    }
+
+    /**
+     * Checks if a block is a 1-block tall flower eligible for Bedrock-style Bone Meal propagation.
+     * Excludes Wither Rose and double-tall plants.
+     */
+    public static boolean isSmallFlower(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        if (state.is(Blocks.WITHER_ROSE)) {
+            return false;
+        }
+        if (state.getBlock() instanceof DoublePlantBlock) {
+            return false;
+        }
+        return state.is(BlockTags.FLOWERS) || state.getBlock() instanceof FlowerBlock;
     }
 
     public static boolean isChorusFlower(ItemStack stack) {
@@ -455,6 +473,9 @@ public class PlantClassifier {
         if (state.is(Blocks.GRASS_BLOCK) || state.is(Blocks.TALL_GRASS) || state.is(Blocks.FERN)
                 || state.is(Blocks.LARGE_FERN) || state.is(Blocks.SHORT_GRASS)) {
             return false;
+        }
+        if (isSmallFlower(state)) {
+            return true;
         }
         return state.getBlock() instanceof BonemealableBlock;
     }

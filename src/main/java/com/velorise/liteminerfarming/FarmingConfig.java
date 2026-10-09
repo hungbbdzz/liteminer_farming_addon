@@ -34,6 +34,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue GHOST_FARMLAND_PREVIEW;
     public static final ModConfigSpec.BooleanValue SMART_MELON_PUMPKIN_PLANTING;
     public static final ModConfigSpec.BooleanValue SMART_FLOWER_PLANTING;
+    public static final ModConfigSpec.BooleanValue BEDROCK_FLOWER_BONEMEAL;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -159,6 +160,10 @@ public class FarmingConfig {
         SMART_FLOWER_PLANTING = builder
                 .comment("When mass planting flowers (#minecraft:flowers) or mushrooms (#c:mushrooms), space them in an anti-overcrowded checkerboard layout instead of dense clumps.")
                 .define("smart_flower_planting", true);
+
+        BEDROCK_FLOWER_BONEMEAL = builder
+                .comment("Allow using Bone Meal on small 1-block flowers (Poppy, Dandelion, etc.) to spread duplicates onto surrounding blocks like Minecraft Bedrock Edition.")
+                .define("bedrock_flower_bonemeal", true);
 
         builder.pop();
         SPEC = builder.build();

@@ -3,6 +3,8 @@ package com.velorise.liteminerfarming;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -77,11 +79,6 @@ public class FarmingEventHandler {
         InteractionHand hand = event.getHand();
         ItemStack heldItem = player.getItemInHand(hand);
 
-        // Check if activation condition is met (LiteMiner, FTB Ultimine, or Sneak fallback)
-        if (!isVeinActive(player)) {
-            return;
-        }
-
         BlockPos clickedPos = event.getPos();
         Direction clickedFace = event.getFace();
         if (clickedFace == Direction.DOWN) {
@@ -89,6 +86,34 @@ public class FarmingEventHandler {
         }
 
         BlockState clickedState = level.getBlockState(clickedPos);
+
+        // Bedrock-style single-click flower bone meal (works even without vein key active)
+        if (heldItem.is(Items.BONE_MEAL) && FarmingManager.isSmallFlower(clickedState) && !isVeinActive(player)) {
+            if (level.isClientSide()) {
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCanceled(true);
+                player.swing(hand);
+                return;
+            }
+            if (player instanceof ServerPlayer serverPlayer) {
+                boolean sprouted = FarmingManager.applyFlowerBoneMeal(level, clickedPos, clickedState, serverPlayer);
+                if (sprouted) {
+                    if (!serverPlayer.isCreative()) {
+                        heldItem.shrink(1);
+                    }
+                    level.playSound(null, clickedPos, SoundEvents.BONE_MEAL_USE, SoundSource.BLOCKS, 1.0F, 1.0F);
+                    serverPlayer.swing(hand, true);
+                    event.setCancellationResult(InteractionResult.SUCCESS);
+                    event.setCanceled(true);
+                    return;
+                }
+            }
+        }
+
+        // Check if activation condition is met (LiteMiner, FTB Ultimine, or Sneak fallback)
+        if (!isVeinActive(player)) {
+            return;
+        }
 
         // On client side: cancel event if it's an active farming target to prevent ghost prediction
         if (level.isClientSide()) {
@@ -171,7 +196,8 @@ public class FarmingEventHandler {
         if (heldItem.is(Items.BONE_MEAL)) {
             boolean isFarmTarget = FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
                     || FarmingManager.isBonemealCrop(clickedState)
-                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()));
+                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))
+                    || FarmingManager.isSmallFlower(clickedState);
             if (!isFarmTarget) {
                 return; // Do NOT trigger mass bone meal on wild grass blocks!
             }
@@ -208,7 +234,8 @@ public class FarmingEventHandler {
         if (heldItem.is(Items.BONE_MEAL)) {
             return FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
                     || FarmingManager.isBonemealCrop(clickedState)
-                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()));
+                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))
+                    || FarmingManager.isSmallFlower(clickedState);
         }
         if (FarmingManager.isPlantableSeed(heldItem)) {
             if (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos)

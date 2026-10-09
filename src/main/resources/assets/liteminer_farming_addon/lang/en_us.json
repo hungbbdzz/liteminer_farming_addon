@@ -14,5 +14,6 @@
   "config.liteminer_farming_addon.clear_foliage": "Clear Replaceable Foliage when Hoeing",
   "config.liteminer_farming_addon.exhaustion_per_block": "Exhaustion Per Block",
   "config.liteminer_farming_addon.require_sneak_fallback": "Require Sneak Fallback",
-  "config.liteminer_farming_addon.use_liteminer_limit": "Use LiteMiner Limit"
+  "config.liteminer_farming_addon.use_liteminer_limit": "Use LiteMiner Limit",
+  "config.liteminer_farming_addon.bedrock_flower_bonemeal": "Bedrock-style Flower Bone Meal Propagation"
 }

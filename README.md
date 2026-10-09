@@ -67,9 +67,13 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
 
 ---
 
-### 🦴 3. AOE Bone Meal (Smart Fertilizing)
-* Hold **Bone Meal** and **Right-click** on crops.
+### 🦴 3. AOE Bone Meal (Smart Fertilizing & Flower Propagation)
+* Hold **Bone Meal** and **Right-click** on crops or flowers.
 * **Smart Area Growth:** Even if the clicked crop is already mature, Bone Meal will automatically bypass it and continue fertilizing all other growing crops in the area until they reach 100% maturity!
+* **🌸 Bedrock-Style Flower Propagation (`bedrock_flower_bonemeal`):**
+  - Right-click small flowers (**Poppy, Dandelion, Tulips, Cornflower, Orchids, Allium, etc.**) with Bone Meal to propagate clones onto surrounding grass/dirt blocks, exactly like Minecraft Bedrock Edition!
+  - **Single-Click Mode:** Spreads 1–4 duplicate blooms and companion short grass within a 7x7 meadow area.
+  - **Vein Mass Mode (`Shift` / Trigger Key):** Cascades bone meal across entire connected wildflower patches with ascending audio pitches, instantly creating lush, vibrant flowering fields!
 * In **Creative Mode**, bone meal is never consumed. In Survival, it draws safely from your hand and inventory.
 
 ---

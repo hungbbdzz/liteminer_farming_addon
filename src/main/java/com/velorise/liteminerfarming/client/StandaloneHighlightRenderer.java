@@ -215,9 +215,14 @@ public class StandaloneHighlightRenderer {
             } else if (heldItem.is(Items.BONE_MEAL)) {
                 if (FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
                         || FarmingManager.isBonemealCrop(clickedState)
-                        || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))) {
+                        || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))
+                        || FarmingManager.isSmallFlower(clickedState)) {
                     previewBlocks = FarmingManager.fallbackCropSearch(level, clickedPos);
-                    r = 0.3f; g = 0.9f; b = 0.4f; // Emerald Jade
+                    if (FarmingManager.isSmallFlower(clickedState)) {
+                        r = 0.95f; g = 0.55f; b = 0.85f; // Flora Blossom Pink
+                    } else {
+                        r = 0.3f; g = 0.9f; b = 0.4f; // Emerald Jade
+                    }
                 }
             }
 
@@ -313,15 +318,23 @@ public class StandaloneHighlightRenderer {
         if (isHoe && FarmingConfig.GHOST_FARMLAND_PREVIEW.get() && !previewBlocks.isEmpty()) {
             VertexConsumer translucentConsumer = bufferSource.getBuffer(RenderType.translucent());
             for (BlockPos pos : previewBlocks) {
+                BlockState targetState = level.getBlockState(pos);
+                VoxelShape shape = targetState.getShape(level, pos);
+                double blockTop = shape.isEmpty() ? 1.0 : shape.max(Direction.Axis.Y);
+                // Farmland model is 0.9375 (15/16) tall. Elevate so top face sits 0.003 above the block surface (eliminating grass occlusion and dirt path z-fighting)
+                double yOffset = (blockTop - 0.9375) + 0.003;
+
                 boolean hasWater = FarmingManager.isNearWater(level, pos);
                 BlockState farmlandState = Blocks.FARMLAND.defaultBlockState()
                         .setValue(FarmBlock.MOISTURE, hasWater ? 7 : 0);
-                float alpha = hasWater ? 0.65f : 0.35f;
+                float alpha = hasWater ? 0.70f : 0.50f;
                 FadedVertexConsumer fadedConsumer = new FadedVertexConsumer(translucentConsumer, alpha);
                 MultiBufferSource fadedBuffer = type -> fadedConsumer;
 
                 poseStack.pushPose();
-                poseStack.translate(pos.getX() - camPos.x, pos.getY() - camPos.y, pos.getZ() - camPos.z);
+                poseStack.translate(pos.getX() - camPos.x + 0.5, pos.getY() - camPos.y + yOffset, pos.getZ() - camPos.z + 0.5);
+                poseStack.scale(1.002f, 1.0f, 1.002f);
+                poseStack.translate(-0.5, 0.0, -0.5);
                 int light = LevelRenderer.getLightColor(level, pos.above());
                 mc.getBlockRenderer().renderSingleBlock(
                         farmlandState,

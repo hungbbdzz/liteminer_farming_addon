@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -220,6 +221,37 @@ public class TillingAndFertilizingManager {
                     }
                 }
 
+                ItemStack held = player.getItemInHand(hand);
+                if (!held.is(Items.BONE_MEAL)) {
+                    break;
+                }
+
+                if (PlantClassifier.isSmallFlower(state)) {
+                    if (applyFlowerBoneMeal(level, cropPos, state, player)) {
+                        fertilizedCount++;
+                        anyFertilizedThisPass = true;
+
+                        boolean audioCascade = FarmingConfig.SATISFYING_AUDIO_CASCADE.get();
+                        float pitch = audioCascade 
+                                ? (0.85F + Math.min(0.50F, (fertilizedCount / 20.0F) * 0.50F))
+                                : 1.0F;
+                        level.playSound(null, cropPos, SoundEvents.BONE_MEAL_USE, SoundSource.BLOCKS, 1.0F, pitch);
+
+                        if (!player.isCreative()) {
+                            held.shrink(1);
+                        }
+
+                        if (!player.isCreative() && player.getItemInHand(hand).isEmpty() && FarmingConfig.PULL_FROM_INVENTORY.get()) {
+                            FarmingManager.replenishHand(player, hand, Items.BONE_MEAL);
+                        }
+
+                        if (!player.isCreative() && exhaustion > 0) {
+                            player.causeFoodExhaustion(exhaustion);
+                        }
+                    }
+                    continue;
+                }
+
                 if (!(state.getBlock() instanceof BonemealableBlock bonemealable)) {
                     continue;
                 }
@@ -227,11 +259,6 @@ public class TillingAndFertilizingManager {
                 // Check if this crop can still accept bone meal (skip crops that are already fully mature)
                 if (!bonemealable.isValidBonemealTarget(level, cropPos, state)) {
                     continue;
-                }
-
-                ItemStack held = player.getItemInHand(hand);
-                if (!held.is(Items.BONE_MEAL)) {
-                    break;
                 }
 
                 // In Creative mode, use a copy of the stack so player's bone meal is never consumed
@@ -262,6 +289,56 @@ public class TillingAndFertilizingManager {
             return true;
         }
 
+        return false;
+    }
+
+    /**
+     * Bedrock-style flower bone meal propagation.
+     * When bone meal is used on a 1-block flower (Poppy, Dandelion, etc.), clones of the flower
+     * (and occasional companion grass) sprout in a radius around it.
+     */
+    public static boolean applyFlowerBoneMeal(Level level, BlockPos originPos, BlockState originState, Player player) {
+        if (!FarmingConfig.BEDROCK_FLOWER_BONEMEAL.get() || !PlantClassifier.isSmallFlower(originState)) {
+            return false;
+        }
+
+        int attempts = 12;
+        int spawnedCount = 0;
+        RandomSource random = level.getRandom();
+
+        for (int i = 0; i < attempts; i++) {
+            int dx = random.nextInt(7) - 3;
+            int dz = random.nextInt(7) - 3;
+            int dy = random.nextInt(3) - 1;
+            if (dx == 0 && dz == 0 && dy == 0) {
+                continue;
+            }
+
+            BlockPos targetPos = originPos.offset(dx, dy, dz);
+            BlockState targetState = level.getBlockState(targetPos);
+
+            if (!targetState.isAir() && !targetState.canBeReplaced()) {
+                continue;
+            }
+
+            if (!originState.canSurvive(level, targetPos)) {
+                continue;
+            }
+
+            if (random.nextFloat() < 0.75F) {
+                level.setBlock(targetPos, originState, 3);
+                level.gameEvent(player, GameEvent.BLOCK_PLACE, targetPos);
+                spawnedCount++;
+            } else if (targetState.isAir() && Blocks.SHORT_GRASS.defaultBlockState().canSurvive(level, targetPos)) {
+                level.setBlock(targetPos, Blocks.SHORT_GRASS.defaultBlockState(), 3);
+                level.gameEvent(player, GameEvent.BLOCK_PLACE, targetPos);
+            }
+        }
+
+        if (spawnedCount > 0) {
+            level.levelEvent(1505, originPos, 15);
+            return true;
+        }
         return false;
     }
 
@@ -310,6 +387,21 @@ public class TillingAndFertilizingManager {
 
     public static boolean isTillable(Level level, Player player, InteractionHand hand, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
+        if (PlantClassifier.isFarmland(state)) {
+            return false;
+        }
+
+        BlockPos above = pos.above();
+        BlockState aboveState = level.getBlockState(above);
+        boolean isValuableCrop = aboveState.getBlock() instanceof CropBlock || aboveState.getBlock() instanceof StemBlock;
+        if (isValuableCrop) {
+            return false;
+        }
+        boolean clearFoliage = FarmingConfig.CLEAR_FOLIAGE.get();
+        if (!aboveState.isAir() && !(clearFoliage && (aboveState.canBeReplaced() || aboveState.is(BlockTags.REPLACEABLE_BY_TREES) || aboveState.is(BlockTags.FLOWERS) || (aboveState.getBlock() instanceof BushBlock)))) {
+            return false;
+        }
+
         UseOnContext context = new UseOnContext(player, hand, new BlockHitResult(
                 Vec3.atCenterOf(pos).add(0, 0.5, 0), Direction.UP, pos, false
         ));
@@ -360,10 +452,16 @@ public class TillingAndFertilizingManager {
             }
 
             boolean isSameCropType = targetCropBlock == null || candidateState.is(targetCropBlock);
-            if (isSameCropType && PlantClassifier.isBonemealCrop(candidateState) && candidateState.getBlock() instanceof BonemealableBlock bonemealable) {
-                if (bonemealable.isValidBonemealTarget(level, candidateCrop, candidateState)) {
+            if (isSameCropType && PlantClassifier.isBonemealCrop(candidateState)) {
+                if (PlantClassifier.isSmallFlower(candidateState)) {
                     if (!result.contains(candidateCrop)) {
                         result.add(candidateCrop);
+                    }
+                } else if (candidateState.getBlock() instanceof BonemealableBlock bonemealable) {
+                    if (bonemealable.isValidBonemealTarget(level, candidateCrop, candidateState)) {
+                        if (!result.contains(candidateCrop)) {
+                            result.add(candidateCrop);
+                        }
                     }
                 }
             }

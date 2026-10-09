@@ -176,6 +176,7 @@ public class FarmingManager {
     public static boolean isMushroomBlock(BlockState state) { return PlantClassifier.isMushroomBlock(state); }
     public static boolean isFlower(ItemStack stack) { return PlantClassifier.isFlower(stack); }
     public static boolean isFlowerBlock(BlockState state) { return PlantClassifier.isFlowerBlock(state); }
+    public static boolean isSmallFlower(BlockState state) { return PlantClassifier.isSmallFlower(state); }
     public static boolean isChorusFlower(ItemStack stack) { return PlantClassifier.isChorusFlower(stack); }
     public static boolean isChorus(BlockState state) { return PlantClassifier.isChorus(state); }
     public static boolean isCocoaBean(ItemStack stack) { return PlantClassifier.isCocoaBean(stack); }
@@ -308,5 +309,8 @@ public class FarmingManager {
     }
     public static boolean isTillable(Level level, Player player, InteractionHand hand, BlockPos pos) {
         return TillingAndFertilizingManager.isTillable(level, player, hand, pos);
+    }
+    public static boolean applyFlowerBoneMeal(Level level, BlockPos originPos, BlockState originState, Player player) {
+        return TillingAndFertilizingManager.applyFlowerBoneMeal(level, originPos, originState, player);
     }
 }

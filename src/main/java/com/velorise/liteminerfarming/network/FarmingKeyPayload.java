@@ -26,3 +26,4 @@ public record FarmingKeyPayload(boolean active) implements CustomPacketPayload {
         return TYPE;
     }
 }
+
