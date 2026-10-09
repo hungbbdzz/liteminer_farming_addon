@@ -32,6 +32,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue FARMERS_DELIGHT_KNIFE_COMPAT;
     public static final ModConfigSpec.BooleanValue GROWTH_PENALTY_WARNING;
     public static final ModConfigSpec.BooleanValue GHOST_FARMLAND_PREVIEW;
+    public static final ModConfigSpec.BooleanValue SMART_MELON_PUMPKIN_PLANTING;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -149,6 +150,10 @@ public class FarmingConfig {
         GHOST_FARMLAND_PREVIEW = builder
                 .comment("Display a faded translucent 3D ghost preview of Farmland when holding a hoe, with visual moisture feedback.")
                 .define("ghost_farmland_preview", true);
+
+        SMART_MELON_PUMPKIN_PLANTING = builder
+                .comment("When planting Melon or Pumpkin seeds, automatically plant stems in an optimal 40/40 checkerboard pattern, preserving adjacent spaces for fruits to grow.")
+                .define("smart_melon_pumpkin_planting", true);
 
         builder.pop();
         SPEC = builder.build();

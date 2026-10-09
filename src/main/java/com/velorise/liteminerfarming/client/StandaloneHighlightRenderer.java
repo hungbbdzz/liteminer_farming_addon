@@ -31,7 +31,9 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class StandaloneHighlightRenderer {
 
@@ -342,6 +344,55 @@ public class StandaloneHighlightRenderer {
                 poseStack.popPose();
             }
             bufferSource.endBatch(RenderType.translucent());
+        }
+
+        // Render translucent 3D ghost fruits (Melon / Pumpkin) on the reserved fruit spots
+        if (isPlanting && FarmingManager.isFruitSeed(heldItem) && !previewBlocks.isEmpty()) {
+            Block fruitBlock = FarmingManager.getFruitForSeed(heldItem);
+            if (fruitBlock != null) {
+                BlockState fruitState = fruitBlock.defaultBlockState();
+                Set<BlockPos> fruitSpots = new HashSet<>();
+                Set<BlockPos> stemSoilSet = new HashSet<>(previewBlocks);
+
+                for (BlockPos soil : previewBlocks) {
+                    for (Direction dir : Direction.Plane.HORIZONTAL) {
+                        BlockPos neighborSoil = soil.relative(dir);
+                        if (!stemSoilSet.contains(neighborSoil)) {
+                            BlockState neighborSoilState = level.getBlockState(neighborSoil);
+                            if (FarmingManager.isFarmland(neighborSoilState) || neighborSoilState.is(net.minecraft.tags.BlockTags.DIRT)) {
+                                BlockPos fruitPos = neighborSoil.above();
+                                BlockState fruitPosState = level.getBlockState(fruitPos);
+                                if (fruitPosState.isAir() || fruitPosState.canBeReplaced()) {
+                                    fruitSpots.add(fruitPos);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!fruitSpots.isEmpty()) {
+                    VertexConsumer translucentConsumer = bufferSource.getBuffer(RenderType.translucent());
+                    FadedVertexConsumer fadedFruitConsumer = new FadedVertexConsumer(translucentConsumer, 0.35f);
+                    MultiBufferSource fadedFruitBuffer = type -> fadedFruitConsumer;
+
+                    for (BlockPos fruitPos : fruitSpots) {
+                        poseStack.pushPose();
+                        poseStack.translate(fruitPos.getX() - camPos.x, fruitPos.getY() - camPos.y, fruitPos.getZ() - camPos.z);
+                        int light = LevelRenderer.getLightColor(level, fruitPos);
+                        mc.getBlockRenderer().renderSingleBlock(
+                                fruitState,
+                                poseStack,
+                                fadedFruitBuffer,
+                                light,
+                                net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
+                                net.neoforged.neoforge.client.model.data.ModelData.EMPTY,
+                                RenderType.translucent()
+                        );
+                        poseStack.popPose();
+                    }
+                    bufferSource.endBatch(RenderType.translucent());
+                }
+            }
         }
     }
 

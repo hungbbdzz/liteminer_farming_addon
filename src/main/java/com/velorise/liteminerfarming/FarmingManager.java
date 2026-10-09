@@ -655,6 +655,99 @@ public class FarmingManager {
         return false;
     }
 
+    public static boolean isFruitSeed(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return stack.is(Items.MELON_SEEDS) || stack.is(Items.PUMPKIN_SEEDS);
+    }
+
+    public static Block getFruitForSeed(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return null;
+        if (stack.is(Items.MELON_SEEDS)) return Blocks.MELON;
+        if (stack.is(Items.PUMPKIN_SEEDS)) return Blocks.PUMPKIN;
+        return null;
+    }
+
+    public static BlockPos findNearbyWaterBlock(Level level, BlockPos originPos, int radius) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    BlockPos p = originPos.offset(dx, dy, dz);
+                    if (level.getFluidState(p).is(FluidTags.WATER) || level.getBlockState(p).is(Blocks.WATER)) {
+                        return p;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Optimal Melon & Pumpkin Stem Planting (Inverted Checkerboard 40/40 Layout):
+     * Places stems exclusively in a checkerboard pattern aligned with water/existing stems,
+     * guaranteeing every single stem has empty adjacent fruit spots and zero growth speed penalty!
+     */
+    public static List<BlockPos> filterOptimalFruitStemPositions(
+            Level level,
+            List<BlockPos> candidateSoils,
+            BlockPos originSoilPos
+    ) {
+        if (candidateSoils == null || candidateSoils.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 1. Determine target parity for stems:
+        // Priority A: Align with existing stems in candidate soils
+        int existingStemCount0 = 0;
+        int existingStemCount1 = 0;
+        for (BlockPos soil : candidateSoils) {
+            BlockState above = level.getBlockState(soil.above());
+            if (isStem(above)) {
+                int p = Math.floorMod(soil.getX() + soil.getZ(), 2);
+                if (p == 0) existingStemCount0++;
+                else existingStemCount1++;
+            }
+        }
+
+        int targetParity;
+        if (existingStemCount0 > 0 || existingStemCount1 > 0) {
+            targetParity = (existingStemCount0 >= existingStemCount1) ? 0 : 1;
+        } else {
+            // Priority B: Check for nearby water within radius 6 (e.g. 9x9 farm center water block)
+            BlockPos waterPos = findNearbyWaterBlock(level, originSoilPos, 6);
+            if (waterPos != null) {
+                int waterParity = Math.floorMod(waterPos.getX() + waterPos.getZ(), 2);
+                // Stems sit on the opposite parity of water so water block falls on a fruit spot!
+                targetParity = 1 - waterParity;
+            } else {
+                // Priority C: Count viable candidates for parity 0 vs 1 and pick the larger set
+                int count0 = 0;
+                int count1 = 0;
+                for (BlockPos soil : candidateSoils) {
+                    if (Math.floorMod(soil.getX() + soil.getZ(), 2) == 0) count0++;
+                    else count1++;
+                }
+                targetParity = (count0 >= count1) ? 0 : 1;
+            }
+        }
+
+        // 2. Select candidates strictly matching targetParity
+        List<BlockPos> result = new ArrayList<>();
+        for (BlockPos soil : candidateSoils) {
+            if (Math.floorMod(soil.getX() + soil.getZ(), 2) == targetParity) {
+                BlockPos above = soil.above();
+                BlockState aboveState = level.getBlockState(above);
+                if (aboveState.isAir() || aboveState.canBeReplaced()) {
+                    result.add(soil);
+                }
+            }
+        }
+
+        result.sort(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)));
+        return result;
+    }
+
     /**
      * Universal farmland check supporting vanilla and modded farmlands.
      */
@@ -1402,6 +1495,11 @@ public class FarmingManager {
 
         if (isCactus(seedStack)) {
             sorted = filterOptimalCactusPositions(level, sorted, originSoilPos);
+            if (sorted == null || sorted.isEmpty()) {
+                return false;
+            }
+        } else if (isFruitSeed(seedStack) && FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.get()) {
+            sorted = filterOptimalFruitStemPositions(level, sorted, originSoilPos);
             if (sorted == null || sorted.isEmpty()) {
                 return false;
             }
@@ -2727,6 +2825,8 @@ public class FarmingManager {
 
         if (isCactus(seedStack)) {
             result = filterOptimalCactusPositions(level, result, actualSoil);
+        } else if (isFruitSeed(seedStack) && FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.get()) {
+            result = filterOptimalFruitStemPositions(level, result, actualSoil);
         } else if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
             result = filterSmartSaplingPositions(level, result, seedStack, actualSoil);
         }
