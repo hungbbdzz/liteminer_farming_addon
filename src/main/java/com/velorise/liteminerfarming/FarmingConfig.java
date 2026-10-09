@@ -30,6 +30,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue SMART_IRRIGATION_PREVIEW;
     public static final ModConfigSpec.BooleanValue BATCH_COMPOSTER;
     public static final ModConfigSpec.BooleanValue FARMERS_DELIGHT_KNIFE_COMPAT;
+    public static final ModConfigSpec.BooleanValue GROWTH_PENALTY_WARNING;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -139,6 +140,10 @@ public class FarmingConfig {
         FARMERS_DELIGHT_KNIFE_COMPAT = builder
                 .comment("Allow Farmer's Delight / modded knives to harvest crops in an AOE, damaging the knife and dropping Straw.")
                 .define("farmers_delight_knife_compat", true);
+
+        GROWTH_PENALTY_WARNING = builder
+                .comment("Highlight planting preview locations that will suffer vanilla 50% growth penalties in warning coral/red.")
+                .define("growth_penalty_warning", true);
 
         builder.pop();
         SPEC = builder.build();

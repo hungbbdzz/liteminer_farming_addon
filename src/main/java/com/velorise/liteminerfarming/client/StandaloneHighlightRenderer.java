@@ -29,6 +29,8 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 public class StandaloneHighlightRenderer {
 
@@ -211,6 +213,22 @@ public class StandaloneHighlightRenderer {
 
         poseStack.pushPose();
 
+        Map<BlockPos, Block> plannedIntercrop = null;
+        if (isPlanting && ghostOffState != null) {
+            BlockPos originSoilPos = FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) ? clickedPos : clickedPos.below();
+            Block mainCropBlock = FarmingManager.getCropBlock(heldItem);
+            Block offCropBlock = FarmingManager.getCropBlock(offItem);
+            boolean evenIsMain = FarmingManager.determineIntercropPhase(level, originSoilPos, player.getDirection(), mainCropBlock, offCropBlock);
+            boolean alternateOnX = (player.getDirection().getAxis() == Direction.Axis.Z);
+
+            plannedIntercrop = new HashMap<>();
+            for (BlockPos p : previewBlocks) {
+                int rowCoord = alternateOnX ? (p.getX() - originSoilPos.getX()) : (p.getZ() - originSoilPos.getZ());
+                boolean isMainRow = (Math.floorMod(rowCoord, 2) == 0) ? evenIsMain : !evenIsMain;
+                plannedIntercrop.put(p.above(), isMainRow ? mainCropBlock : offCropBlock);
+            }
+        }
+
         float lineAlpha = (isPlanting && ghostPlantState != null) ? 0.35f : a;
         for (BlockPos pos : previewBlocks) {
             BlockPos renderPos = isPlanting ? pos.above() : pos;
@@ -227,6 +245,7 @@ public class StandaloneHighlightRenderer {
             net.minecraft.world.phys.AABB camRelative = aabb.move(-camPos.x, -camPos.y, -camPos.z);
 
             float boxR = r, boxG = g, boxB = b;
+            float currentAlpha = lineAlpha;
             if (isHoe && FarmingConfig.SMART_IRRIGATION_PREVIEW.get()) {
                 boolean hasWater = FarmingManager.isNearWater(level, pos);
                 if (hasWater) {
@@ -234,9 +253,19 @@ public class StandaloneHighlightRenderer {
                 } else {
                     boxR = 0.95f; boxG = 0.45f; boxB = 0.15f; // Warning Dry Amber/Orange
                 }
+            } else if (isPlanting && plannedIntercrop != null && FarmingConfig.GROWTH_PENALTY_WARNING.get()) {
+                Block plannedCrop = plannedIntercrop.get(renderPos);
+                boolean hasPenalty = FarmingManager.hasGrowthPenalty(level, renderPos, plannedCrop, plannedIntercrop);
+                if (hasPenalty) {
+                    boxR = 1.0f; boxG = 0.28f; boxB = 0.2f; // Warning Coral Crimson
+                    currentAlpha = 0.85f;
+                } else {
+                    boxR = 0.35f; boxG = 0.85f; boxB = 0.3f; // Full 200% growth speed Sprout Green
+                    currentAlpha = 0.35f;
+                }
             }
 
-            LevelRenderer.renderLineBox(poseStack, consumer, camRelative, boxR, boxG, boxB, lineAlpha);
+            LevelRenderer.renderLineBox(poseStack, consumer, camRelative, boxR, boxG, boxB, currentAlpha);
         }
 
         poseStack.popPose();

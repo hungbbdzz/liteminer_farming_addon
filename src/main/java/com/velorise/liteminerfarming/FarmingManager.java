@@ -1015,6 +1015,57 @@ public class FarmingManager {
     }
 
     /**
+     * Checks if placing candidateCrop at plantPos will suffer the vanilla 50% growth penalty
+     * (when the same crop is present in both orthogonal axes or on any diagonal).
+     */
+    public static boolean hasGrowthPenalty(
+            Level level,
+            BlockPos plantPos,
+            Block candidateCrop,
+            Map<BlockPos, Block> plannedCrops
+    ) {
+        if (candidateCrop == null || level == null) {
+            return false;
+        }
+
+        BlockPos north = plantPos.north();
+        BlockPos south = plantPos.south();
+        BlockPos east = plantPos.east();
+        BlockPos west = plantPos.west();
+
+        boolean sameX = isMatchingCropAt(level, west, candidateCrop, plannedCrops)
+                || isMatchingCropAt(level, east, candidateCrop, plannedCrops);
+        boolean sameZ = isMatchingCropAt(level, north, candidateCrop, plannedCrops)
+                || isMatchingCropAt(level, south, candidateCrop, plannedCrops);
+
+        if (sameX && sameZ) {
+            return true;
+        }
+
+        boolean diagonal = isMatchingCropAt(level, west.north(), candidateCrop, plannedCrops)
+                || isMatchingCropAt(level, east.north(), candidateCrop, plannedCrops)
+                || isMatchingCropAt(level, east.south(), candidateCrop, plannedCrops)
+                || isMatchingCropAt(level, west.south(), candidateCrop, plannedCrops);
+
+        return diagonal;
+    }
+
+    private static boolean isMatchingCropAt(
+            Level level,
+            BlockPos cropPos,
+            Block targetCrop,
+            Map<BlockPos, Block> plannedCrops
+    ) {
+        if (plannedCrops != null && plannedCrops.containsKey(cropPos)) {
+            Block planned = plannedCrops.get(cropPos);
+            return isMatchingCrop(planned != null ? planned.defaultBlockState() : null, targetCrop);
+        }
+
+        BlockState existing = findCropAtColumn(level, cropPos.getX(), cropPos.getY(), cropPos.getZ());
+        return isMatchingCrop(existing, targetCrop);
+    }
+
+    /**
      * Determines whether even rows (relative to origin) should be the main hand crop
      * using distance-weighted voting from existing crops in the vicinity.
      * Prevents any two adjacent parallel rows from ever having the same crop type.
