@@ -31,6 +31,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue BATCH_COMPOSTER;
     public static final ModConfigSpec.BooleanValue FARMERS_DELIGHT_KNIFE_COMPAT;
     public static final ModConfigSpec.BooleanValue GROWTH_PENALTY_WARNING;
+    public static final ModConfigSpec.BooleanValue GHOST_FARMLAND_PREVIEW;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -144,6 +145,10 @@ public class FarmingConfig {
         GROWTH_PENALTY_WARNING = builder
                 .comment("Highlight planting preview locations that will suffer vanilla 50% growth penalties in warning coral/red.")
                 .define("growth_penalty_warning", true);
+
+        GHOST_FARMLAND_PREVIEW = builder
+                .comment("Display a faded translucent 3D ghost preview of Farmland when holding a hoe, with visual moisture feedback.")
+                .define("ghost_farmland_preview", true);
 
         builder.pop();
         SPEC = builder.build();

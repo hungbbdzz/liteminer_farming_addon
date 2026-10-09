@@ -664,6 +664,36 @@ public class FarmingManager {
     }
 
     /**
+     * Strict check for crops that grow on Farmland (Wheat, Carrots, Potatoes, Beetroots, Torchflower, Pitcher Crop, etc.).
+     * Strictly excludes Column crops (Sugar Cane/Bamboo), Fruit crops (Melon/Pumpkin), Stems, Sweet Berry bushes, Nether Wart, and Cocoa.
+     */
+    public static boolean isFarmlandCrop(BlockState state) {
+        if (state == null || state.isAir() || isStem(state) || isColumnCrop(state) || isFruitCrop(state)) {
+            return false;
+        }
+        Block block = state.getBlock();
+        if (block instanceof CropBlock
+                || state.is(Blocks.PITCHER_CROP)
+                || state.is(Blocks.TORCHFLOWER_CROP)) {
+            return true;
+        }
+        if (state.is(BlockTags.CROPS)) {
+            return true;
+        }
+        if (block instanceof BushBlock
+                && !(block instanceof SweetBerryBushBlock)
+                && !(block instanceof NetherWartBlock)
+                && !(block instanceof CocoaBlock)) {
+            for (Property<?> prop : state.getProperties()) {
+                if (prop instanceof IntegerProperty intProp && intProp.getName().equalsIgnoreCase("age")) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Universal check for vertical column crops (Sugar Cane, Cactus, Bamboo, Kelp).
      */
     public static boolean isColumnCrop(BlockState state) {
@@ -1416,12 +1446,21 @@ public class FarmingManager {
             return false;
         }
 
-        Collection<BlockPos> selected = getSelectedPositions(player, clickedCropPos);
-        if (selected == null || selected.isEmpty()) {
-            selected = getSelectedPositions(player, clickedCropPos.below());
-        }
-        if (selected == null || selected.isEmpty()) {
-            selected = getSelectedPositions(player, clickedCropPos.above());
+        Collection<BlockPos> selected = null;
+        boolean isFarmlandTarget = isFarmland(serverLevel.getBlockState(clickedCropPos))
+                || isFarmland(serverLevel.getBlockState(clickedCropPos.below()))
+                || isFarmlandCrop(serverLevel.getBlockState(clickedCropPos));
+
+        // When harvesting farmland crops, bypass external mining mod walkers (LiteMiner/FTB Ultimine)
+        // so our specialized smart BFS can harvest ALL mature crops across intercropped rows (Wheat, Carrot, Potato, etc.).
+        if (!isFarmlandTarget) {
+            selected = getSelectedPositions(player, clickedCropPos);
+            if (selected == null || selected.isEmpty()) {
+                selected = getSelectedPositions(player, clickedCropPos.below());
+            }
+            if (selected == null || selected.isEmpty()) {
+                selected = getSelectedPositions(player, clickedCropPos.above());
+            }
         }
 
         if (selected == null || selected.isEmpty()) {
@@ -1904,18 +1943,14 @@ public class FarmingManager {
                     result.add(current);
                 }
             } else {
-                // Farmland crops (Wheat, Carrot, Potato, Beetroot, Pitcher Crop, and modded CropBlocks)
+                // Farmland crops (Wheat, Carrot, Potato, Beetroot, Pitcher Crop, Torchflower, and modded CropBlocks)
                 BlockPos harvestPos = current;
                 BlockState harvestState = curState;
                 if (isFarmland(harvestState)) {
                     harvestPos = current.above();
                     harvestState = level.getBlockState(harvestPos);
                 }
-                if (harvestState.is(Blocks.PITCHER_CROP) && isMatureCrop(harvestState)) {
-                    if (!result.contains(harvestPos)) {
-                        result.add(harvestPos);
-                    }
-                } else if (harvestState.is(startState.getBlock()) && isMatureCrop(harvestState) && !isStem(harvestState)) {
+                if (isFarmlandCrop(harvestState) && isMatureCrop(harvestState)) {
                     if (!result.contains(harvestPos)) {
                         result.add(harvestPos);
                     }
@@ -1959,14 +1994,16 @@ public class FarmingManager {
                                 canTraverse = true;
                             }
                         } else {
-                            // Farmland crops: traverse connected Farmland or the SAME crop type!
+                            // Farmland crops: traverse connected Farmland or crops planted on Farmland!
                             if (isFarmland(nextState)) {
                                 BlockState aboveFarmland = level.getBlockState(next.above());
-                                if (aboveFarmland.is(startState.getBlock()) || aboveFarmland.isAir()) {
+                                if (aboveFarmland.isAir() || isFarmlandCrop(aboveFarmland)) {
                                     canTraverse = true;
                                 }
-                            } else if (nextState.is(startState.getBlock())) {
-                                canTraverse = true;
+                            } else if (isFarmlandCrop(nextState)) {
+                                if (isFarmland(level.getBlockState(next.below()))) {
+                                    canTraverse = true;
+                                }
                             }
                         }
 

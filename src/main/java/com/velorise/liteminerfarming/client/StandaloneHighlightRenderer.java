@@ -19,6 +19,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -229,7 +230,7 @@ public class StandaloneHighlightRenderer {
             }
         }
 
-        float lineAlpha = (isPlanting && ghostPlantState != null) ? 0.35f : a;
+        float lineAlpha = ((isPlanting && ghostPlantState != null) || (isHoe && FarmingConfig.GHOST_FARMLAND_PREVIEW.get())) ? 0.35f : a;
         for (BlockPos pos : previewBlocks) {
             BlockPos renderPos = isPlanting ? pos.above() : pos;
             net.minecraft.world.phys.AABB aabb;
@@ -250,8 +251,10 @@ public class StandaloneHighlightRenderer {
                 boolean hasWater = FarmingManager.isNearWater(level, pos);
                 if (hasWater) {
                     boxR = 0.45f; boxG = 0.65f; boxB = 0.35f; // Hydrated Farmland Green-Brown
+                    currentAlpha = 0.40f;
                 } else {
                     boxR = 0.95f; boxG = 0.45f; boxB = 0.15f; // Warning Dry Amber/Orange
+                    currentAlpha = 0.65f;
                 }
             } else if (isPlanting && plannedIntercrop != null && FarmingConfig.GROWTH_PENALTY_WARNING.get()) {
                 Block plannedCrop = plannedIntercrop.get(renderPos);
@@ -270,6 +273,34 @@ public class StandaloneHighlightRenderer {
 
         poseStack.popPose();
         bufferSource.endBatch(RenderType.lines());
+
+        // Render faded 3D ghost block preview of Farmland when holding a hoe
+        if (isHoe && FarmingConfig.GHOST_FARMLAND_PREVIEW.get() && !previewBlocks.isEmpty()) {
+            VertexConsumer translucentConsumer = bufferSource.getBuffer(RenderType.translucent());
+            for (BlockPos pos : previewBlocks) {
+                boolean hasWater = FarmingManager.isNearWater(level, pos);
+                BlockState farmlandState = Blocks.FARMLAND.defaultBlockState()
+                        .setValue(FarmBlock.MOISTURE, hasWater ? 7 : 0);
+                float alpha = hasWater ? 0.65f : 0.35f;
+                FadedVertexConsumer fadedConsumer = new FadedVertexConsumer(translucentConsumer, alpha);
+                MultiBufferSource fadedBuffer = type -> fadedConsumer;
+
+                poseStack.pushPose();
+                poseStack.translate(pos.getX() - camPos.x, pos.getY() - camPos.y, pos.getZ() - camPos.z);
+                int light = LevelRenderer.getLightColor(level, pos.above());
+                mc.getBlockRenderer().renderSingleBlock(
+                        farmlandState,
+                        poseStack,
+                        fadedBuffer,
+                        light,
+                        net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
+                        net.neoforged.neoforge.client.model.data.ModelData.EMPTY,
+                        RenderType.translucent()
+                );
+                poseStack.popPose();
+            }
+            bufferSource.endBatch(RenderType.translucent());
+        }
 
         // Render faded ghost block preview of the exact plant/sapling
         if (ghostPlantState != null && !previewBlocks.isEmpty()) {
