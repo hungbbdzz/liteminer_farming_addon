@@ -4,7 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A lightweight companion addon for **[LiteMiner](https://modrinth.com/mod/liteminer)** on **NeoForge 1.21.1**.
-It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, and **AOE Bone Meal Fertilizing** to LiteMiner, strictly following LiteMiner's shape system and client-side block highlight preview!
+It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, **AOE Bone Meal Fertilizing**, and **Mass Harvesting with Auto-Replant** to LiteMiner, strictly following LiteMiner's shape system and client-side block highlight preview!
+
+![LiteMiner Farming Addon Showcase](https://raw.githubusercontent.com/hungbbdzz/liteminer_farming_addon/main/showcase.gif)
 
 ---
 
