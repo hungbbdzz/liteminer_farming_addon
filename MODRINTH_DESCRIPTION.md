@@ -38,16 +38,29 @@ It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, 
 * Immature crops are left unharmed to keep growing!
 * Fully compatible with **Fortune** enchantments if holding an enchanted tool.
 
----
-
 ## 🎮 How It Works
 
-1. Make sure **LiteMiner** is installed.
-2. Select your desired shape in LiteMiner (e.g. `3x3`, `Shapeless`, etc.).
-3. Hold your LiteMiner veinmine key (`~` by default). The highlight shows the exact target blocks!
-4. **Right-click** with a Hoe, Seeds, Bone Meal, or empty hand on mature crops!
+### With LiteMiner (Recommended Addon Mode)
+1. Select your desired shape in LiteMiner (e.g. `3x3`, `Shapeless`, etc.).
+2. Hold your LiteMiner veinmine key (`~` by default). The highlight shows the exact target blocks!
+3. **Right-click** with a Hoe, Seeds, Bone Meal, or empty hand on mature crops!
 
-> **Note:** If LiteMiner is not installed, the mod gracefully falls back to holding `Sneak (Shift)`.
+### Standalone Mode (No LiteMiner Required)
+LiteMiner is **completely optional**. You can install and use this mod on its own as a standalone farming quality-of-life mod:
+* Simply hold **Sneak (`Shift`)** while right-clicking!
+* All 4 core farming actions (Area Tilling, Mass Planting, Bone Meal, and Mass Harvesting & Replanting) work out of the box.
+
+---
+
+## ⚖️ LiteMiner Addon vs. Standalone Mode
+
+| Feature / Aspect | With LiteMiner (Addon Mode) | Without LiteMiner (Standalone Mode) |
+| :--- | :--- | :--- |
+| **Activation Key** | LiteMiner keybind (`~` by default) | Hold **Sneak (`Shift`)** *(configurable)* |
+| **Area Shapes** | Switchable shapes (`3x3`, `Tunnel`, `Staircase`, `Shapeless`...) | Natural clustered radius search (`farming_radius` & `max_blocks`) |
+| **Target Highlight Preview** | Real-time client outline preview | None (actions execute directly upon click) |
+| **Block Limits** | Inherited from LiteMiner config | Configured via `farming_radius` & `max_blocks` |
+| **Core Mechanics** | Full (Till, Plant, Fertilize, Harvest & Replant) | Full (Till, Plant, Fertilize, Harvest & Replant) |
 
 ---
 
