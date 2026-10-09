@@ -99,7 +99,7 @@ public class FarmingConfig {
 
         SAPLING_MIN_SPACING = builder
                 .comment("Minimum horizontal spacing in blocks between planted saplings in smart planting mode.")
-                .defineInRange("sapling_min_spacing", 3, 1, 10);
+                .defineInRange("sapling_min_spacing", 4, 1, 10);
 
         SMART_SAPLING_2X2 = builder
                 .comment("Automatically plant in 2x2 clusters for trees that support or require 2x2 grids (Dark Oak, Spruce, Jungle).")

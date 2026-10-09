@@ -31,6 +31,7 @@ import net.minecraft.world.level.block.NetherWartBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.AttachedStemBlock;
 import net.minecraft.world.level.block.BambooStalkBlock;
+import net.minecraft.world.level.block.BambooSaplingBlock;
 import net.minecraft.world.level.block.CactusBlock;
 import net.minecraft.world.level.block.CaveVines;
 import net.minecraft.world.level.block.CaveVinesBlock;
@@ -65,13 +66,21 @@ public class FarmingManager {
         if (stack.isEmpty()) {
             return false;
         }
-        if (stack.is(Items.NETHER_WART)) {
+        if (stack.is(Items.NETHER_WART) || stack.is(Items.BAMBOO) || stack.is(Items.SUGAR_CANE)
+                || stack.is(Items.CACTUS) || stack.is(Items.KELP)) {
             return true;
         }
         Item item = stack.getItem();
         if (item instanceof BlockItem blockItem) {
             Block block = blockItem.getBlock();
-            return block instanceof BushBlock || block instanceof CropBlock;
+            if (block instanceof BushBlock || block instanceof CropBlock
+                    || block instanceof BambooSaplingBlock || block instanceof BambooStalkBlock
+                    || block instanceof SugarCaneBlock || block instanceof CactusBlock
+                    || block instanceof KelpBlock || block instanceof KelpPlantBlock) {
+                return true;
+            }
+            String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
+            return id.contains("bamboo") || id.contains("sapling") || id.contains("crop") || id.contains("seed");
         }
         return false;
     }
@@ -472,6 +481,9 @@ public class FarmingManager {
         }
         if (seedStack.is(Items.NETHER_WART)) {
             return isSoulSand(soilState);
+        }
+        if (seedStack.is(Items.BAMBOO)) {
+            return soilState.is(BlockTags.BAMBOO_PLANTABLE_ON) || soilState.is(BlockTags.DIRT) || soilState.is(BlockTags.SAND);
         }
         if (isFarmland(soilState)) {
             return true;
@@ -1828,7 +1840,10 @@ public class FarmingManager {
                         } else if (isFarmlandTarget && isFarmland(nextState)) {
                             matches = true;
                         } else if (isSoilTarget && isValidSoilForSeed(seedStack, nextState, level, next)) {
-                            if (nextState.is(startState.getBlock()) || (startState.is(BlockTags.DIRT) && nextState.is(BlockTags.DIRT))) {
+                            if (nextState.is(startState.getBlock())
+                                    || (startState.is(BlockTags.DIRT) && nextState.is(BlockTags.DIRT))
+                                    || (startState.is(BlockTags.SAND) && nextState.is(BlockTags.SAND))
+                                    || (seedStack.is(Items.BAMBOO) && nextState.is(BlockTags.BAMBOO_PLANTABLE_ON))) {
                                 matches = true;
                             }
                         }
