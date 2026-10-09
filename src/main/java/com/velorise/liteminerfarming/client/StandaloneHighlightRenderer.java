@@ -19,6 +19,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CocoaBlock;
 import net.minecraft.world.level.block.FarmBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
@@ -162,6 +163,8 @@ public class StandaloneHighlightRenderer {
                     || FarmingManager.isFruitCrop(targetCropState)
                     || FarmingManager.isFruitCrop(clickedState)
                     || FarmingManager.isColumnCrop(targetCropState)
+                    || FarmingManager.isChorus(targetCropState)
+                    || FarmingManager.isChorus(clickedState)
                     || (FarmingManager.isRiceCrop(targetCropState) && FarmingManager.isMatureCrop(targetCropState));
 
             boolean isPlant = FarmingManager.isHarvestablePlant(targetCropState)
@@ -187,8 +190,10 @@ public class StandaloneHighlightRenderer {
                 r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
                 isHoe = true;
             } else if (FarmingManager.isPlantableSeed(heldItem) && (
-                    (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) && (level.getBlockState(clickedPos.above()).isAir() || level.getBlockState(clickedPos.above()).canBeReplaced()))
-                    || (FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()) && (clickedState.isAir() || clickedState.canBeReplaced()))
+                    FarmingManager.isCocoaBean(heldItem)
+                        ? (FarmingManager.isJungleLog(clickedState) || clickedState.getBlock() instanceof CocoaBlock)
+                        : ((FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) && (level.getBlockState(clickedPos.above()).isAir() || level.getBlockState(clickedPos.above()).canBeReplaced()))
+                           || (FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()) && (clickedState.isAir() || clickedState.canBeReplaced())))
             )) {
                 previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos, heldItem);
                 r = 0.4f; g = 0.85f; b = 0.3f; // Sprout Green
@@ -255,8 +260,9 @@ public class StandaloneHighlightRenderer {
         }
 
         float lineAlpha = ((isPlanting && ghostPlantState != null) || (isHoe && FarmingConfig.GHOST_FARMLAND_PREVIEW.get())) ? 0.35f : a;
+        boolean isCocoaPlanting = isPlanting && FarmingManager.isCocoaBean(heldItem);
         for (BlockPos pos : previewBlocks) {
-            BlockPos renderPos = isPlanting ? pos.above() : pos;
+            BlockPos renderPos = (isPlanting && !isCocoaPlanting) ? pos.above() : pos;
             net.minecraft.world.phys.AABB aabb;
             if (isPlanting) {
                 aabb = new net.minecraft.world.phys.AABB(renderPos);
@@ -340,17 +346,25 @@ public class StandaloneHighlightRenderer {
                 evenIsMain = FarmingManager.determineIntercropPhase(level, originSoilPos, player.getDirection(), mainCropBlock, offCropBlock);
             }
             boolean alternateOnX = (player.getDirection().getAxis() == Direction.Axis.Z);
-
             for (BlockPos pos : previewBlocks) {
                 BlockState stateToRender = ghostPlantState;
-                if (ghostOffState != null) {
+                if (isCocoaPlanting) {
+                    Direction facing = Direction.NORTH;
+                    for (Direction d : Direction.Plane.HORIZONTAL) {
+                        if (FarmingManager.isJungleLog(level.getBlockState(pos.relative(d)))) {
+                            facing = d;
+                            break;
+                        }
+                    }
+                    stateToRender = Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, facing).setValue(CocoaBlock.AGE, 0);
+                } else if (ghostOffState != null) {
                     int rowCoord = alternateOnX ? (pos.getX() - originSoilPos.getX()) : (pos.getZ() - originSoilPos.getZ());
                     boolean isMainRow = (Math.floorMod(rowCoord, 2) == 0) ? evenIsMain : !evenIsMain;
                     stateToRender = isMainRow ? ghostPlantState : ghostOffState;
                 }
                 if (stateToRender == null) continue;
 
-                BlockPos plantPos = pos.above();
+                BlockPos plantPos = isCocoaPlanting ? pos : pos.above();
                 poseStack.pushPose();
                 poseStack.translate(plantPos.getX() - camPos.x, plantPos.getY() - camPos.y, plantPos.getZ() - camPos.z);
                 int light = LevelRenderer.getLightColor(level, plantPos);
@@ -430,6 +444,24 @@ public class StandaloneHighlightRenderer {
         }
         if (stack.is(Items.NETHER_WART)) {
             return Blocks.NETHER_WART.defaultBlockState();
+        }
+        if (stack.is(Items.COCOA_BEANS)) {
+            return Blocks.COCOA.defaultBlockState();
+        }
+        if (stack.is(Items.CHORUS_FLOWER)) {
+            return Blocks.CHORUS_FLOWER.defaultBlockState();
+        }
+        if (stack.is(Items.RED_MUSHROOM)) {
+            return Blocks.RED_MUSHROOM.defaultBlockState();
+        }
+        if (stack.is(Items.BROWN_MUSHROOM)) {
+            return Blocks.BROWN_MUSHROOM.defaultBlockState();
+        }
+        if (stack.is(Items.CRIMSON_FUNGUS)) {
+            return Blocks.CRIMSON_FUNGUS.defaultBlockState();
+        }
+        if (stack.is(Items.WARPED_FUNGUS)) {
+            return Blocks.WARPED_FUNGUS.defaultBlockState();
         }
         if (stack.getItem() instanceof BlockItem bi) {
             Block b = bi.getBlock();

@@ -33,6 +33,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue GROWTH_PENALTY_WARNING;
     public static final ModConfigSpec.BooleanValue GHOST_FARMLAND_PREVIEW;
     public static final ModConfigSpec.BooleanValue SMART_MELON_PUMPKIN_PLANTING;
+    public static final ModConfigSpec.BooleanValue SMART_FLOWER_PLANTING;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -154,6 +155,10 @@ public class FarmingConfig {
         SMART_MELON_PUMPKIN_PLANTING = builder
                 .comment("When planting Melon or Pumpkin seeds, automatically plant stems in an optimal 40/40 checkerboard pattern, preserving adjacent spaces for fruits to grow.")
                 .define("smart_melon_pumpkin_planting", true);
+
+        SMART_FLOWER_PLANTING = builder
+                .comment("When mass planting flowers (#minecraft:flowers) or mushrooms (#c:mushrooms), space them in an anti-overcrowded checkerboard layout instead of dense clumps.")
+                .define("smart_flower_planting", true);
 
         builder.pop();
         SPEC = builder.build();
