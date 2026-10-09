@@ -30,13 +30,8 @@ public class FarmingEventHandler {
         }
     }
 
-    @SubscribeEvent(priority = EventPriority.HIGH)
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
     public void onBlockBreak(BlockEvent.BreakEvent event) {
-        // If LiteMiner or FTB Ultimine is loaded, let them handle block breaking vein mining!
-        if (LiteMinerCompat.isLiteMinerLoaded() || FTBUltimineCompat.isFTBUltimineLoaded()) {
-            return;
-        }
-
         if (!FarmingConfig.ENABLE_MASS_HARVEST.get()) {
             return;
         }
@@ -49,29 +44,29 @@ public class FarmingEventHandler {
             return;
         }
 
-        boolean active = serverPlayer.isShiftKeyDown();
-        if (!active && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-            active = true;
-        }
-        if (!active) {
-            return;
-        }
-
         BlockPos clickedPos = event.getPos();
         BlockState clickedState = event.getState();
 
-        if (FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState)) {
-            try {
-                IS_HANDLING_BREAK.set(true);
-                InteractionHand hand = InteractionHand.MAIN_HAND;
-                ItemStack heldItem = serverPlayer.getItemInHand(hand);
-                boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, clickedPos);
-                if (handled) {
-                    event.setCanceled(true);
-                }
-            } finally {
-                IS_HANDLING_BREAK.set(false);
+        // Left-click mass destruction strictly ONLY targets harvestable agricultural crops/plants!
+        // Regular blocks (Stone, Dirt, Wood, Ores, etc.) are strictly left to other vein miner mods or vanilla!
+        if (!FarmingManager.isHarvestablePlant(clickedState)) {
+            return;
+        }
+
+        if (!isVeinActive(serverPlayer)) {
+            return;
+        }
+
+        try {
+            IS_HANDLING_BREAK.set(true);
+            InteractionHand hand = InteractionHand.MAIN_HAND;
+            ItemStack heldItem = serverPlayer.getItemInHand(hand);
+            boolean handled = FarmingManager.handleMassDestroy(serverPlayer, hand, heldItem, clickedPos, clickedState);
+            if (handled) {
+                event.setCanceled(true);
             }
+        } finally {
+            IS_HANDLING_BREAK.set(false);
         }
     }
 
@@ -83,31 +78,7 @@ public class FarmingEventHandler {
         ItemStack heldItem = player.getItemInHand(hand);
 
         // Check if activation condition is met (LiteMiner, FTB Ultimine, or Sneak fallback)
-        boolean active = false;
-        if (LiteMinerCompat.isLiteMinerLoaded()) {
-            if (player instanceof ServerPlayer sp) {
-                active = LiteMinerCompat.isLiteMinerActive(sp);
-            }
-        }
-
-        if (!active && FTBUltimineCompat.isFTBUltimineLoaded()) {
-            if (player instanceof ServerPlayer sp) {
-                active = FTBUltimineCompat.isUltimineActive(sp);
-            } else {
-                active = FTBUltimineCompat.isUltimineClientActive();
-            }
-        }
-
-        // If neither LiteMiner nor FTB Ultimine is loaded, use Standalone fallback
-        if (!LiteMinerCompat.isLiteMinerLoaded() && !FTBUltimineCompat.isFTBUltimineLoaded()) {
-            if (FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
-                active = player.isShiftKeyDown();
-            } else {
-                active = true;
-            }
-        }
-
-        if (!active) {
+        if (!isVeinActive(player)) {
             return;
         }
 
@@ -262,5 +233,37 @@ public class FarmingEventHandler {
         return stack.canPerformAction(ItemAbilities.HOE_TILL)
                 || stack.getItem() instanceof HoeItem
                 || stack.is(ItemTags.HOES);
+    }
+
+    public static boolean isVeinActive(Player player) {
+        if (player == null) {
+            return false;
+        }
+        if (LiteMinerCompat.isLiteMinerLoaded()) {
+            if (player instanceof ServerPlayer sp) {
+                if (LiteMinerCompat.isLiteMinerActive(sp)) {
+                    return true;
+                }
+            }
+        }
+        if (FTBUltimineCompat.isFTBUltimineLoaded()) {
+            if (player instanceof ServerPlayer sp) {
+                if (FTBUltimineCompat.isUltimineActive(sp)) {
+                    return true;
+                }
+            } else {
+                if (FTBUltimineCompat.isUltimineClientActive()) {
+                    return true;
+                }
+            }
+        }
+        if (!LiteMinerCompat.isLiteMinerLoaded() && !FTBUltimineCompat.isFTBUltimineLoaded()) {
+            if (FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
+                return player.isShiftKeyDown();
+            } else {
+                return true;
+            }
+        }
+        return false;
     }
 }

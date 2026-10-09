@@ -496,6 +496,166 @@ public class FarmingManager {
     }
 
     /**
+     * Optimal Cactus Planting using Maximum Independent Set on Bipartite Grid Graph:
+     * Guarantees no two cacti ever collide horizontally (orthogonally), respects pre-existing obstacles
+     * and rogue scattered cacti, and mathematically maximizes the total count of planted cacti.
+     */
+    public static List<BlockPos> filterOptimalCactusPositions(
+            Level level,
+            List<BlockPos> candidateSoils,
+            BlockPos originSoilPos
+    ) {
+        if (candidateSoils == null || candidateSoils.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 1. Filter out candidate soils whose plant position is not viable
+        // (must have air above, and NO existing solid block, liquid, or cactus in 4 horizontal directions)
+        List<BlockPos> viableSoils = new ArrayList<>();
+        for (BlockPos soil : candidateSoils) {
+            BlockPos plantPos = soil.above();
+            BlockState aboveState = level.getBlockState(plantPos);
+            if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
+                continue;
+            }
+
+            boolean hasObstacle = false;
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                BlockPos neighborPos = plantPos.relative(dir);
+                BlockState neighborState = level.getBlockState(neighborPos);
+                if (neighborState.isSolid() || neighborState.is(Blocks.CACTUS) || neighborState.liquid()) {
+                    hasObstacle = true;
+                    break;
+                }
+            }
+
+            if (!hasObstacle) {
+                viableSoils.add(soil);
+            }
+        }
+
+        if (viableSoils.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. Partition viable candidates into Bipartite sets L and R based on (x + z) % 2
+        List<BlockPos> setL = new ArrayList<>();
+        List<BlockPos> setR = new ArrayList<>();
+        Map<BlockPos, Integer> indexInR = new HashMap<>();
+
+        for (BlockPos pos : viableSoils) {
+            int parity = Math.floorMod(pos.getX() + pos.getZ(), 2);
+            if (parity == 0) {
+                setL.add(pos);
+            } else {
+                indexInR.put(pos, setR.size());
+                setR.add(pos);
+            }
+        }
+
+        if (setL.isEmpty() || setR.isEmpty()) {
+            return viableSoils;
+        }
+
+        // Build adjacency list for bipartite graph: edge exists if Manhattan distance == 1 horizontally
+        int nL = setL.size();
+        int nR = setR.size();
+        List<List<Integer>> adj = new ArrayList<>(nL);
+        for (int i = 0; i < nL; i++) {
+            adj.add(new ArrayList<>());
+        }
+
+        for (int i = 0; i < nL; i++) {
+            BlockPos pL = setL.get(i);
+            for (Direction dir : Direction.Plane.HORIZONTAL) {
+                BlockPos neighbor = pL.relative(dir);
+                Integer rIdx = indexInR.get(neighbor);
+                if (rIdx != null) {
+                    adj.get(i).add(rIdx);
+                } else {
+                    Integer rIdxUp = indexInR.get(neighbor.above());
+                    if (rIdxUp != null) adj.get(i).add(rIdxUp);
+                    Integer rIdxDown = indexInR.get(neighbor.below());
+                    if (rIdxDown != null) adj.get(i).add(rIdxDown);
+                }
+            }
+        }
+
+        // 3. Maximum Bipartite Matching using augmenting paths (DFS)
+        int[] matchL = new int[nL];
+        Arrays.fill(matchL, -1);
+        int[] matchR = new int[nR];
+        Arrays.fill(matchR, -1);
+
+        for (int i = 0; i < nL; i++) {
+            boolean[] visited = new boolean[nR];
+            dfsBipartiteMatch(i, adj, matchR, matchL, visited);
+        }
+
+        // 4. Konig's Theorem: find all reachable vertices from unmatched vertices in L
+        boolean[] reachableL = new boolean[nL];
+        boolean[] reachableR = new boolean[nR];
+        Queue<Integer> queue = new ArrayDeque<>();
+
+        for (int i = 0; i < nL; i++) {
+            if (matchL[i] == -1) {
+                reachableL[i] = true;
+                queue.add(i);
+            }
+        }
+
+        while (!queue.isEmpty()) {
+            int u = queue.poll();
+            for (int v : adj.get(u)) {
+                if (matchL[u] != v && !reachableR[v]) {
+                    reachableR[v] = true;
+                    int matchedU = matchR[v];
+                    if (matchedU != -1 && !reachableL[matchedU]) {
+                        reachableL[matchedU] = true;
+                        queue.add(matchedU);
+                    }
+                }
+            }
+        }
+
+        // 5. Maximum Independent Set (L reachable + R unreachable)
+        List<BlockPos> result = new ArrayList<>();
+        for (int i = 0; i < nL; i++) {
+            if (reachableL[i]) {
+                result.add(setL.get(i));
+            }
+        }
+        for (int j = 0; j < nR; j++) {
+            if (!reachableR[j]) {
+                result.add(setR.get(j));
+            }
+        }
+
+        result.sort(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)));
+        return result;
+    }
+
+    private static boolean dfsBipartiteMatch(
+            int u,
+            List<List<Integer>> adj,
+            int[] matchR,
+            int[] matchL,
+            boolean[] visited
+    ) {
+        for (int v : adj.get(u)) {
+            if (!visited[v]) {
+                visited[v] = true;
+                if (matchR[v] < 0 || dfsBipartiteMatch(matchR[v], adj, matchR, matchL, visited)) {
+                    matchR[v] = u;
+                    matchL[u] = v;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Universal farmland check supporting vanilla and modded farmlands.
      */
     public static boolean isFarmland(BlockState state) {
@@ -519,12 +679,22 @@ public class FarmingManager {
         return state.is(Blocks.SOUL_SAND) || state.is(BlockTags.SOUL_SPEED_BLOCKS);
     }
 
+    public static boolean isCactus(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return stack.is(Items.CACTUS) || (stack.getItem() instanceof BlockItem bi && bi.getBlock() instanceof CactusBlock);
+    }
+
     /**
      * Universal soil check for any seed.
      */
     public static boolean isValidSoilForSeed(ItemStack seedStack, BlockState soilState, Level level, BlockPos soilPos) {
         if (seedStack.isEmpty() || soilState == null) {
             return false;
+        }
+        if (isCactus(seedStack)) {
+            return soilState.is(BlockTags.SAND) || soilState.is(Blocks.SAND) || soilState.is(Blocks.RED_SAND);
         }
         if (seedStack.is(Items.NETHER_WART)) {
             return isSoulSand(soilState);
@@ -691,6 +861,26 @@ public class FarmingManager {
             }
         }
         return false;
+    }
+
+    /**
+     * Checks if a block is an agricultural crop or harvestable plant.
+     * Strictly excludes regular environmental blocks (Stone, Dirt, Wood, Ores, etc.).
+     */
+    public static boolean isHarvestablePlant(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        return isCrop(state)
+                || isColumnCrop(state)
+                || isFruitCrop(state)
+                || isStem(state)
+                || state.getBlock() instanceof NetherWartBlock
+                || state.getBlock() instanceof CocoaBlock
+                || state.getBlock() instanceof SweetBerryBushBlock
+                || state.getBlock() instanceof CaveVines
+                || state.is(Blocks.CAVE_VINES)
+                || state.is(Blocks.CAVE_VINES_PLANT);
     }
 
     /**
@@ -1210,7 +1400,12 @@ public class FarmingManager {
                 .sorted(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)))
                 .toList();
 
-        if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
+        if (isCactus(seedStack)) {
+            sorted = filterOptimalCactusPositions(level, sorted, originSoilPos);
+            if (sorted == null || sorted.isEmpty()) {
+                return false;
+            }
+        } else if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
             sorted = filterSmartSaplingPositions(level, sorted, seedStack, originSoilPos);
             if (sorted == null || sorted.isEmpty()) {
                 return false;
@@ -1847,6 +2042,320 @@ public class FarmingManager {
         }
     }
 
+    /**
+     * Left-Click Mass Destruction: Completely wipes connected agricultural crops and plants (including root blocks of column crops),
+     * without replanting, leaving clean soil for replanting new crops.
+     * Strictly restricted to agricultural crops/plants, leaving regular stone/dirt/ores untouched.
+     */
+    public static boolean handleMassDestroy(ServerPlayer player, InteractionHand hand, ItemStack heldItem, BlockPos clickedPos, BlockState clickedState) {
+        if (!FarmingConfig.ENABLE_MASS_HARVEST.get()) {
+            return false;
+        }
+
+        Level level = player.level();
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return false;
+        }
+
+        Collection<BlockPos> targets = findDestroyTargets(serverLevel, clickedPos, clickedState);
+        if (targets == null || targets.isEmpty()) {
+            return false;
+        }
+
+        List<BlockPos> sorted = new ArrayList<>(targets);
+        boolean isColumn = isColumnCrop(clickedState);
+        if (isColumn) {
+            sorted.sort((a, b) -> {
+                int cmpY = Integer.compare(b.getY(), a.getY());
+                if (cmpY != 0) return cmpY;
+                return Integer.compare(a.distManhattan(clickedPos), b.distManhattan(clickedPos));
+            });
+        } else {
+            sorted.sort(Comparator.comparingInt(p -> p.distManhattan(clickedPos)));
+        }
+
+        int maxLimit = getEffectiveBlockLimit(player);
+        boolean preventBreaking = shouldPreventToolBreaking(player);
+        float exhaustion = getFoodExhaustion(player);
+        boolean harvestToInventory = FarmingConfig.HARVEST_TO_INVENTORY.get();
+
+        int destroyedCount = 0;
+        List<ItemStack> allDrops = new ArrayList<>();
+
+        for (BlockPos pos : sorted) {
+            if (destroyedCount >= maxLimit) {
+                break;
+            }
+
+            if (!player.isCreative() && !heldItem.isEmpty() && heldItem.isDamageableItem()) {
+                if (preventBreaking && heldItem.getDamageValue() >= heldItem.getMaxDamage() - 1) {
+                    break;
+                }
+            }
+
+            BlockState state = serverLevel.getBlockState(pos);
+            if (state.isAir()) {
+                continue;
+            }
+
+            if (harvestToInventory) {
+                List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, null, player, heldItem);
+                allDrops.addAll(drops);
+                serverLevel.destroyBlock(pos, false, player);
+            } else {
+                serverLevel.destroyBlock(pos, true, player);
+            }
+
+            destroyedCount++;
+
+            if (!player.isCreative()) {
+                if (!heldItem.isEmpty() && heldItem.isDamageableItem()) {
+                    heldItem.hurtAndBreak(1, player, hand == InteractionHand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND);
+                }
+                if (exhaustion > 0) {
+                    player.causeFoodExhaustion(exhaustion);
+                }
+            }
+        }
+
+        if (destroyedCount > 0) {
+            if (harvestToInventory && !allDrops.isEmpty()) {
+                List<ItemStack> merged = mergeItemStacks(allDrops);
+                for (ItemStack drop : merged) {
+                    boolean added = player.getInventory().add(drop);
+                    if (!added || !drop.isEmpty()) {
+                        Block.popResource(serverLevel, clickedPos, drop);
+                    }
+                }
+                player.containerMenu.broadcastChanges();
+            }
+
+            player.swing(hand, true);
+            if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
+                FTBUltimineCompat.applyPostUltimineCosts(player, destroyedCount);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    public static Collection<BlockPos> findDestroyTargets(ServerLevel level, BlockPos clickedPos, BlockState clickedState) {
+        int maxLimit = FarmingConfig.MAX_BLOCKS.get();
+        int radius = FarmingConfig.FARMING_RADIUS.get();
+        Set<BlockPos> visited = new HashSet<>();
+        List<BlockPos> result = new ArrayList<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
+
+        if (isColumnCrop(clickedState)) {
+            BlockPos startRoot = getColumnCropRoot(level, clickedPos);
+            queue.add(startRoot);
+            visited.add(startRoot);
+
+            while (!queue.isEmpty() && result.size() < maxLimit) {
+                BlockPos currentRoot = queue.poll();
+                BlockState rootState = level.getBlockState(currentRoot);
+
+                // For mass destruction, collect the root itself!
+                result.add(currentRoot);
+
+                // Collect all stalks above currentRoot!
+                BlockPos stalk = currentRoot.above();
+                while (isSameColumnType(rootState, level.getBlockState(stalk))) {
+                    if (result.size() >= maxLimit) break;
+                    result.add(stalk);
+                    stalk = stalk.above();
+                }
+
+                // Check 8 horizontal neighbors for adjacent column roots
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            BlockPos neighborPos = currentRoot.offset(dx, dy, dz);
+                            if (visited.contains(neighborPos)) continue;
+                            if (Math.abs(neighborPos.getX() - startRoot.getX()) > radius
+                                    || Math.abs(neighborPos.getZ() - startRoot.getZ()) > radius
+                                    || Math.abs(neighborPos.getY() - startRoot.getY()) > 3) {
+                                continue;
+                            }
+
+                            BlockState neighborState = level.getBlockState(neighborPos);
+                            if (isSameColumnType(clickedState, neighborState)) {
+                                BlockPos neighborRoot = getColumnCropRoot(level, neighborPos);
+                                if (!visited.contains(neighborRoot)) {
+                                    visited.add(neighborRoot);
+                                    queue.add(neighborRoot);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        // Fruit crops / stems
+        if (isFruitCrop(clickedState) || isStem(clickedState)) {
+            queue.add(clickedPos);
+            visited.add(clickedPos);
+
+            while (!queue.isEmpty() && result.size() < maxLimit) {
+                BlockPos curr = queue.poll();
+                result.add(curr);
+
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            BlockPos next = curr.offset(dx, dy, dz);
+                            if (visited.contains(next)) continue;
+                            if (Math.abs(next.getX() - clickedPos.getX()) > radius
+                                    || Math.abs(next.getZ() - clickedPos.getZ()) > radius
+                                    || Math.abs(next.getY() - clickedPos.getY()) > 2) {
+                                continue;
+                            }
+
+                            BlockState nextState = level.getBlockState(next);
+                            if (isFruitCrop(nextState) || isStem(nextState)) {
+                                visited.add(next);
+                                queue.add(next);
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        // Nether Wart
+        if (clickedState.getBlock() instanceof NetherWartBlock) {
+            queue.add(clickedPos);
+            visited.add(clickedPos);
+
+            while (!queue.isEmpty() && result.size() < maxLimit) {
+                BlockPos curr = queue.poll();
+                result.add(curr);
+
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            BlockPos next = curr.offset(dx, dy, dz);
+                            if (visited.contains(next)) continue;
+                            if (Math.abs(next.getX() - clickedPos.getX()) > radius
+                                    || Math.abs(next.getZ() - clickedPos.getZ()) > radius
+                                    || Math.abs(next.getY() - clickedPos.getY()) > 2) {
+                                continue;
+                            }
+
+                            BlockState nextState = level.getBlockState(next);
+                            if (nextState.getBlock() instanceof NetherWartBlock || isSoulSand(nextState)) {
+                                visited.add(next);
+                                queue.add(next);
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        // Cocoa
+        if (clickedState.getBlock() instanceof CocoaBlock) {
+            queue.add(clickedPos);
+            visited.add(clickedPos);
+
+            while (!queue.isEmpty() && result.size() < maxLimit) {
+                BlockPos curr = queue.poll();
+                result.add(curr);
+
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        for (int dy = -1; dy <= 1; dy++) {
+                            BlockPos next = curr.offset(dx, dy, dz);
+                            if (visited.contains(next)) continue;
+                            if (Math.abs(next.getX() - clickedPos.getX()) > radius
+                                    || Math.abs(next.getZ() - clickedPos.getZ()) > radius
+                                    || Math.abs(next.getY() - clickedPos.getY()) > 2) {
+                                continue;
+                            }
+
+                            BlockState nextState = level.getBlockState(next);
+                            if (nextState.getBlock() instanceof CocoaBlock) {
+                                visited.add(next);
+                                queue.add(next);
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        // Farmland crops: wipe all crops across contiguous farmland
+        BlockPos actualCropPos = clickedPos;
+        if (isFarmland(clickedState)) {
+            actualCropPos = clickedPos.above();
+        }
+
+        queue.add(actualCropPos);
+        visited.add(actualCropPos);
+
+        while (!queue.isEmpty() && result.size() < maxLimit) {
+            BlockPos current = queue.poll();
+            BlockState curState = level.getBlockState(current);
+
+            BlockPos cropPos = current;
+            BlockState cropState = curState;
+            if (isFarmland(cropState)) {
+                cropPos = current.above();
+                cropState = level.getBlockState(cropPos);
+            }
+
+            if (isCrop(cropState) && !result.contains(cropPos)) {
+                result.add(cropPos);
+            }
+
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos next = current.offset(dx, dy, dz);
+                        if (visited.contains(next)) continue;
+                        if (Math.abs(next.getX() - actualCropPos.getX()) > radius
+                                || Math.abs(next.getZ() - actualCropPos.getZ()) > radius
+                                || Math.abs(next.getY() - actualCropPos.getY()) > 2) {
+                            continue;
+                        }
+
+                        BlockState nextState = level.getBlockState(next);
+                        boolean canTraverse = false;
+
+                        if (isFarmland(nextState)) {
+                            BlockState above = level.getBlockState(next.above());
+                            if (above.isAir() || isCrop(above)) {
+                                canTraverse = true;
+                            }
+                        } else if (isCrop(nextState)) {
+                            if (isFarmland(level.getBlockState(next.below()))) {
+                                canTraverse = true;
+                            }
+                        }
+
+                        if (canTraverse) {
+                            visited.add(next);
+                            queue.add(next);
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
     public static Collection<BlockPos> fallbackHarvestSearch(Level level, BlockPos startPos) {
         int maxLimit = FarmingConfig.MAX_BLOCKS.get();
         int radius = FarmingConfig.FARMING_RADIUS.get();
@@ -2216,7 +2725,9 @@ public class FarmingManager {
             }
         }
 
-        if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
+        if (isCactus(seedStack)) {
+            result = filterOptimalCactusPositions(level, result, actualSoil);
+        } else if (isSapling(seedStack) && FarmingConfig.SMART_SAPLING_PLANTING.get()) {
             result = filterSmartSaplingPositions(level, result, seedStack, actualSoil);
         }
 
