@@ -20,10 +20,57 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 
 public class FarmingEventHandler {
 
+    private static final ThreadLocal<Boolean> IS_HANDLING_BREAK = ThreadLocal.withInitial(() -> false);
+
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onFarmlandTrample(BlockEvent.FarmlandTrampleEvent event) {
         if (FarmingConfig.PREVENT_FARMLAND_TRAMPLE.get()) {
             event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public void onBlockBreak(BlockEvent.BreakEvent event) {
+        // If LiteMiner or FTB Ultimine is loaded, let them handle block breaking vein mining!
+        if (LiteMinerCompat.isLiteMinerLoaded() || FTBUltimineCompat.isFTBUltimineLoaded()) {
+            return;
+        }
+
+        if (!FarmingConfig.ENABLE_MASS_HARVEST.get()) {
+            return;
+        }
+
+        if (IS_HANDLING_BREAK.get()) {
+            return;
+        }
+
+        if (!(event.getPlayer() instanceof ServerPlayer serverPlayer)) {
+            return;
+        }
+
+        boolean active = serverPlayer.isShiftKeyDown();
+        if (!active && !FarmingConfig.REQUIRE_SNEAK_FALLBACK.get()) {
+            active = true;
+        }
+        if (!active) {
+            return;
+        }
+
+        BlockPos clickedPos = event.getPos();
+        BlockState clickedState = event.getState();
+
+        if (FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState)) {
+            try {
+                IS_HANDLING_BREAK.set(true);
+                InteractionHand hand = InteractionHand.MAIN_HAND;
+                ItemStack heldItem = serverPlayer.getItemInHand(hand);
+                boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, clickedPos);
+                if (handled) {
+                    event.setCanceled(true);
+                }
+            } finally {
+                IS_HANDLING_BREAK.set(false);
+            }
         }
     }
 

@@ -1609,11 +1609,22 @@ public class FarmingManager {
                 if (curState.getBlock() instanceof NetherWartBlock && isMatureCrop(curState)) {
                     result.add(current);
                 }
-                // Pitcher Crop or standard Farmland crops (STRICTLY same crop type!)
-                if (curState.is(Blocks.PITCHER_CROP) && isMatureCrop(curState)) {
-                    result.add(current);
-                } else if (curState.is(startState.getBlock()) && isMatureCrop(curState) && !isStem(curState)) {
-                    result.add(current);
+            } else {
+                // Farmland crops (Wheat, Carrot, Potato, Beetroot, Pitcher Crop, and modded CropBlocks)
+                BlockPos harvestPos = current;
+                BlockState harvestState = curState;
+                if (isFarmland(harvestState)) {
+                    harvestPos = current.above();
+                    harvestState = level.getBlockState(harvestPos);
+                }
+                if (harvestState.is(Blocks.PITCHER_CROP) && isMatureCrop(harvestState)) {
+                    if (!result.contains(harvestPos)) {
+                        result.add(harvestPos);
+                    }
+                } else if (harvestState.is(startState.getBlock()) && isMatureCrop(harvestState) && !isStem(harvestState)) {
+                    if (!result.contains(harvestPos)) {
+                        result.add(harvestPos);
+                    }
                 }
             }
 
