@@ -25,10 +25,11 @@ It seamlessly brings **Area Tilling (Hoe)**, **Mass Planting (Seeds & Crops)**, 
 * **Right-click** on Farmland with your LiteMiner key active to carpet-plant all empty Farmland blocks in the selected shape!
 * **Smart Inventory Replenishment:** If the stack in your hand runs out, the mod automatically consumes matching seeds from your inventory.
 
-### 🦴 3. AOE Bone Meal (Fertilizing)
+### 🦴 3. AOE Bone Meal (Smart Fertilizing)
 * Hold **Bone Meal** and **Right-click** on crops with your LiteMiner key active.
-* Automatically fertilizes all eligible crops in the selected area!
-* Spawns standard green growth particles and sounds, and replenishes bone meal from your inventory when needed.
+* **Smart Area Growth:** Even if the block you are looking at is already fully mature, Bone Meal will automatically bypass it and continue fertilizing all other growing crops in the selected area until they reach 100% maturity!
+* In **Creative Mode**, bone meal is never consumed. In Survival, it safely draws from your hand and inventory as needed.
+* Holding Bone Meal will never accidentally trigger harvesting.
 
 ### 🌾 4. Mass Harvesting (AOE Harvest & Replant)
 * **Right-click** on any mature crop (`Wheat`, `Carrots`, `Potatoes`, `Beetroots`, `Nether Wart`, `Cocoa`, `Sweet Berry Bush`, or modded crops like **Farmer's Delight**) with your LiteMiner key active (or `Shift/Sneak`).
@@ -91,6 +92,8 @@ The config file is generated automatically at `.minecraft/config/liteminer_farmi
   replant_crops = true
   # If holding a hoe when mass harvesting, consume durability per crop
   damage_hoe_on_harvest = true
+  # Continue fertilizing growing crops in the selected area until they reach maturity
+  smart_bonemeal = true
 ```
 
 ---

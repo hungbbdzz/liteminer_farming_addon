@@ -58,16 +58,19 @@ public class FarmingEventHandler {
 
         // 1. Mass Harvesting (AOE Harvest & Replant)
         // Works with empty hand, hoe, or any held item when targeting a mature crop (or farmland with a mature crop)
-        boolean isDirectCrop = FarmingManager.isMatureCrop(clickedState);
-        boolean isFarmlandWithCrop = FarmingManager.isFarmland(clickedState) && FarmingManager.isMatureCrop(level.getBlockState(clickedPos.above()));
+        // Note: When holding Bone Meal, never harvest - prioritize fertilizing growing crops in the area!
+        if (!heldItem.is(Items.BONE_MEAL)) {
+            boolean isDirectCrop = FarmingManager.isMatureCrop(clickedState);
+            boolean isFarmlandWithCrop = FarmingManager.isFarmland(clickedState) && FarmingManager.isMatureCrop(level.getBlockState(clickedPos.above()));
 
-        if (isDirectCrop || isFarmlandWithCrop) {
-            BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
-            boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
-            if (handled) {
-                event.setCancellationResult(InteractionResult.SUCCESS);
-                event.setCanceled(true);
-                return;
+            if (isDirectCrop || isFarmlandWithCrop) {
+                BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
+                boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
+                if (handled) {
+                    event.setCancellationResult(InteractionResult.SUCCESS);
+                    event.setCanceled(true);
+                    return;
+                }
             }
         }
 

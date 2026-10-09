@@ -15,6 +15,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_MASS_HARVEST;
     public static final ModConfigSpec.BooleanValue REPLANT_CROPS;
     public static final ModConfigSpec.BooleanValue DAMAGE_HOE_ON_HARVEST;
+    public static final ModConfigSpec.BooleanValue SMART_BONEMEAL;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -64,6 +65,10 @@ public class FarmingConfig {
         DAMAGE_HOE_ON_HARVEST = builder
                 .comment("If holding a hoe when mass harvesting, consume durability per crop.")
                 .define("damage_hoe_on_harvest", true);
+
+        SMART_BONEMEAL = builder
+                .comment("When applying bone meal, continue fertilizing growing crops in the selected area until they reach maturity.")
+                .define("smart_bonemeal", true);
 
         builder.pop();
         SPEC = builder.build();

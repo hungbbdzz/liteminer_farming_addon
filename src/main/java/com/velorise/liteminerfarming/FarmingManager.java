@@ -215,7 +215,7 @@ public class FarmingManager {
                     }
 
                     tilledCount++;
-                    if (exhaustion > 0) {
+                    if (!player.isCreative() && exhaustion > 0) {
                         player.causeFoodExhaustion(exhaustion);
                     }
                 }
@@ -310,7 +310,7 @@ public class FarmingManager {
                         }
 
                         plantedCount++;
-                        if (exhaustion > 0) {
+                        if (!player.isCreative() && exhaustion > 0) {
                             player.causeFoodExhaustion(exhaustion);
                         }
                     } else {
@@ -366,43 +366,67 @@ public class FarmingManager {
 
         int maxLimit = LiteMinerCompat.getEffectiveBlockLimit();
         float exhaustion = LiteMinerCompat.getFoodExhaustion();
+        boolean smartBonemeal = FarmingConfig.SMART_BONEMEAL.get();
 
         int fertilizedCount = 0;
+        int maxPasses = smartBonemeal ? 8 : 1;
+        int pass = 0;
+        boolean anyFertilizedThisPass = true;
 
-        for (BlockPos pos : sorted) {
-            if (fertilizedCount >= maxLimit) {
-                break;
-            }
+        while (anyFertilizedThisPass && fertilizedCount < maxLimit && pass < maxPasses) {
+            pass++;
+            anyFertilizedThisPass = false;
 
-            if (!player.isCreative() && player.getItemInHand(hand).isEmpty()) {
-                break;
-            }
+            for (BlockPos pos : sorted) {
+                if (fertilizedCount >= maxLimit) {
+                    break;
+                }
 
-            BlockPos cropPos = pos;
-            if (!(level.getBlockState(cropPos).getBlock() instanceof BonemealableBlock)) {
-                if (level.getBlockState(pos.above()).getBlock() instanceof BonemealableBlock) {
-                    cropPos = pos.above();
-                } else {
+                if (!player.isCreative() && player.getItemInHand(hand).isEmpty()) {
+                    break;
+                }
+
+                BlockPos cropPos = pos;
+                BlockState state = level.getBlockState(cropPos);
+                if (!(state.getBlock() instanceof BonemealableBlock)) {
+                    if (level.getBlockState(pos.above()).getBlock() instanceof BonemealableBlock) {
+                        cropPos = pos.above();
+                        state = level.getBlockState(cropPos);
+                    } else {
+                        continue;
+                    }
+                }
+
+                if (!(state.getBlock() instanceof BonemealableBlock bonemealable)) {
                     continue;
                 }
-            }
 
-            ItemStack held = player.getItemInHand(hand);
-            if (!held.is(Items.BONE_MEAL)) {
-                break;
-            }
-
-            if (BoneMealItem.applyBonemeal(held, level, cropPos, player)) {
-                level.levelEvent(1505, cropPos, 15);
-                fertilizedCount++;
-
-                // Replenish bone meal from inventory if hand stack empties
-                if (!player.isCreative() && player.getItemInHand(hand).isEmpty() && FarmingConfig.PULL_FROM_INVENTORY.get()) {
-                    replenishHand(player, hand, Items.BONE_MEAL);
+                // Check if this crop can still accept bone meal (skip crops that are already fully mature)
+                if (!bonemealable.isValidBonemealTarget(level, cropPos, state)) {
+                    continue;
                 }
 
-                if (exhaustion > 0) {
-                    player.causeFoodExhaustion(exhaustion);
+                ItemStack held = player.getItemInHand(hand);
+                if (!held.is(Items.BONE_MEAL)) {
+                    break;
+                }
+
+                // In Creative mode, use a copy of the stack so player's bone meal is never consumed
+                ItemStack stackToUse = player.isCreative() ? held.copy() : held;
+
+                if (BoneMealItem.applyBonemeal(stackToUse, level, cropPos, player)) {
+                    level.levelEvent(1505, cropPos, 15);
+                    fertilizedCount++;
+                    anyFertilizedThisPass = true;
+
+                    // Replenish bone meal from inventory if hand stack empties
+                    if (!player.isCreative() && player.getItemInHand(hand).isEmpty() && FarmingConfig.PULL_FROM_INVENTORY.get()) {
+                        replenishHand(player, hand, Items.BONE_MEAL);
+                    }
+
+                    if (!player.isCreative() && exhaustion > 0) {
+                        player.causeFoodExhaustion(exhaustion);
+                    }
                 }
             }
         }
