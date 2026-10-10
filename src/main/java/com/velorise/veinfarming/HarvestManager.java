@@ -524,9 +524,12 @@ public class HarvestManager {
         boolean preventBreaking = FarmingManager.shouldPreventToolBreaking(player);
         float exhaustion = FarmingManager.getFoodExhaustion(player);
         boolean harvestToInventory = FarmingConfig.HARVEST_TO_INVENTORY.get();
+        boolean collectAtTarget = FarmingConfig.COLLECT_DROPS_AT_TARGET.get();
+        boolean gatherDrops = harvestToInventory || collectAtTarget;
 
         int destroyedCount = 0;
         List<ItemStack> allDrops = new ArrayList<>();
+        SoundType lastSoundType = null;
 
         for (BlockPos pos : sorted) {
             if (destroyedCount >= maxLimit) {
@@ -544,8 +547,16 @@ public class HarvestManager {
                 continue;
             }
 
-            if (harvestToInventory) {
-                List<ItemStack> drops = Block.getDrops(state, serverLevel, pos, null, player, heldItem);
+            lastSoundType = state.getSoundType(serverLevel, pos, player);
+
+            if (gatherDrops) {
+                List<ItemStack> drops = new ArrayList<>(Block.getDrops(state, serverLevel, pos, null, player, heldItem));
+                if (PlantClassifier.isKnife(heldItem)) {
+                    Item strawItem = BuiltInRegistries.ITEM.get(ResourceLocation.fromNamespaceAndPath("farmersdelight", "straw"));
+                    if (strawItem != null && strawItem != Items.AIR && serverLevel.random.nextFloat() < 0.20F) {
+                        drops.add(new ItemStack(strawItem));
+                    }
+                }
                 allDrops.addAll(drops);
                 serverLevel.destroyBlock(pos, false, player);
             } else {
@@ -568,6 +579,7 @@ public class HarvestManager {
             if (harvestToInventory && !allDrops.isEmpty()) {
                 List<ItemStack> merged = FarmingManager.mergeItemStacks(allDrops);
                 for (ItemStack drop : merged) {
+                    if (drop.isEmpty()) continue;
                     boolean added = player.getInventory().add(drop);
                     if (!added || !drop.isEmpty()) {
                         Block.popResource(serverLevel, clickedPos, drop);
@@ -579,6 +591,20 @@ public class HarvestManager {
                     }
                 } catch (Throwable ignored) {
                 }
+            } else if (collectAtTarget && !allDrops.isEmpty()) {
+                List<ItemStack> merged = FarmingManager.mergeItemStacks(allDrops);
+                for (ItemStack drop : merged) {
+                    if (!drop.isEmpty()) {
+                        Block.popResource(serverLevel, clickedPos, drop);
+                    }
+                }
+            }
+
+            if (FarmingConfig.SATISFYING_AUDIO_CASCADE.get()) {
+                serverLevel.playSound(null, clickedPos, SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.45F, 1.25F);
+            } else if (lastSoundType != null) {
+                serverLevel.playSound(null, clickedPos, lastSoundType.getBreakSound(), SoundSource.BLOCKS,
+                        (lastSoundType.getVolume() + 1.0F) / 2.0F, lastSoundType.getPitch() * 0.8F);
             }
 
             player.swing(hand, true);
