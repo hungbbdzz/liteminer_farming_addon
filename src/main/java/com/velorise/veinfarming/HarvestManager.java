@@ -433,7 +433,12 @@ public class HarvestManager {
                         Block.popResource(serverLevel, clickedCropPos, drop);
                     }
                 }
-                player.containerMenu.broadcastChanges();
+                try {
+                    if (player.containerMenu != null) {
+                        player.containerMenu.broadcastChanges();
+                    }
+                } catch (Throwable ignored) {
+                }
             } else if (collectAtTarget && !allDrops.isEmpty()) {
                 List<ItemStack> mergedDrops = FarmingManager.mergeItemStacks(allDrops);
                 for (ItemStack drop : mergedDrops) {
@@ -568,7 +573,12 @@ public class HarvestManager {
                         Block.popResource(serverLevel, clickedPos, drop);
                     }
                 }
-                player.containerMenu.broadcastChanges();
+                try {
+                    if (player.containerMenu != null) {
+                        player.containerMenu.broadcastChanges();
+                    }
+                } catch (Throwable ignored) {
+                }
             }
 
             player.swing(hand, true);

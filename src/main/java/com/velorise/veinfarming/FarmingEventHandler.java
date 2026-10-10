@@ -24,6 +24,8 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 public class FarmingEventHandler {
 
     private static final ThreadLocal<Boolean> IS_HANDLING_BREAK = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<Boolean> IS_HANDLING_RIGHT_CLICK = ThreadLocal.withInitial(() -> false);
+    private static final java.util.Map<java.util.UUID, Long> LAST_RIGHT_CLICK_TICK = new java.util.concurrent.ConcurrentHashMap<>();
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onFarmlandTrample(BlockEvent.FarmlandTrampleEvent event) {
@@ -67,6 +69,8 @@ public class FarmingEventHandler {
             if (handled) {
                 event.setCanceled(true);
             }
+        } catch (Throwable t) {
+            VeinFarmingMod.LOGGER.error("Vein Farming: Error during block break handling", t);
         } finally {
             IS_HANDLING_BREAK.set(false);
         }
@@ -74,6 +78,10 @@ public class FarmingEventHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (IS_HANDLING_RIGHT_CLICK.get()) {
+            return;
+        }
+
         Level level = event.getLevel();
         Player player = event.getEntity();
         InteractionHand hand = event.getHand();
@@ -130,101 +138,123 @@ public class FarmingEventHandler {
             return;
         }
 
-        // 0. Batch Composter (1-Click mass composting)
-        if (clickedState.is(Blocks.COMPOSTER) && FarmingConfig.BATCH_COMPOSTER.get() && FarmingManager.isCompostable(heldItem)) {
-            boolean handled = FarmingManager.handleBatchCompost(serverPlayer, hand, heldItem, clickedPos);
-            if (handled) {
-                event.setCancellationResult(InteractionResult.SUCCESS);
-                event.setCanceled(true);
-                return;
-            }
+        // Fast-click debounce check (server-side):
+        // Prevents duplicate packet spam (autoclickers) and dual-wield (main-hand + off-hand) re-triggering within the same tick.
+        long currentTick = level.getGameTime();
+        Long lastTick = LAST_RIGHT_CLICK_TICK.get(player.getUUID());
+        if (lastTick != null && currentTick - lastTick < 2) {
+            return;
         }
 
-        // 1. Mass Harvesting (AOE Harvest & Replant)
-        if (!heldItem.is(Items.BONE_MEAL)) {
-            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState) || FarmingManager.isChorus(clickedState);
-            boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState) || clickedState.is(Blocks.END_STONE);
-            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
-                    || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
-                    || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()))
-                    || FarmingManager.isChorus(level.getBlockState(clickedPos.above()));
+        try {
+            IS_HANDLING_RIGHT_CLICK.set(true);
 
-            // If player clicks empty soil while holding seeds, prioritize mass planting over harvesting
-            boolean plantingOnEmptySoil = isSoil && level.getBlockState(clickedPos.above()).isAir() && FarmingManager.isPlantableSeed(heldItem);
-
-            if (!plantingOnEmptySoil && (isDirectCrop || isSoil || isAboveCrop)) {
-                BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
-                boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
+            // 0. Batch Composter (1-Click mass composting)
+            if (clickedState.is(Blocks.COMPOSTER) && FarmingConfig.BATCH_COMPOSTER.get() && FarmingManager.isCompostable(heldItem)) {
+                boolean handled = FarmingManager.handleBatchCompost(serverPlayer, hand, heldItem, clickedPos);
                 if (handled) {
+                    LAST_RIGHT_CLICK_TICK.put(player.getUUID(), currentTick);
                     event.setCancellationResult(InteractionResult.SUCCESS);
                     event.setCanceled(true);
                     return;
                 }
             }
-        }
 
-        // If hand is empty and harvest didn't trigger, nothing more to do
-        if (heldItem.isEmpty()) {
-            return;
-        }
+            // 1. Mass Harvesting (AOE Harvest & Replant)
+            if (!heldItem.is(Items.BONE_MEAL)) {
+                boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState) || FarmingManager.isChorus(clickedState);
+                boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState) || clickedState.is(Blocks.END_STONE);
+                boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
+                        || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
+                        || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()))
+                        || FarmingManager.isChorus(level.getBlockState(clickedPos.above()));
 
-        // 1. Hoe Interaction (Mass Tilling)
-        if (isHoe(heldItem)) {
-            boolean handled = FarmingManager.handleMassHoe(serverPlayer, hand, heldItem, clickedPos);
-            if (handled) {
-                event.setCancellationResult(InteractionResult.SUCCESS);
-                event.setCanceled(true);
-            }
-            return;
-        }
+                // If player clicks empty soil while holding seeds, prioritize mass planting over harvesting
+                boolean plantingOnEmptySoil = isSoil && level.getBlockState(clickedPos.above()).isAir() && FarmingManager.isPlantableSeed(heldItem);
 
-        // 2. Planting Interaction (Mass Planting)
-        if (FarmingManager.isPlantableSeed(heldItem)) {
-            boolean handled = FarmingManager.handleMassPlanting(serverPlayer, hand, heldItem, clickedPos);
-            if (handled) {
-                event.setCancellationResult(InteractionResult.SUCCESS);
-                event.setCanceled(true);
-            } else if (FarmingManager.isSapling(heldItem) && FarmingConfig.isSmartSaplingEnabled()) {
-                // If smart sapling planting could not find enough space to plant a group/grove,
-                // cancel the event so vanilla does NOT sneak-place a single lonely sapling!
-                event.setCancellationResult(InteractionResult.FAIL);
-                event.setCanceled(true);
-            }
-            return;
-        }
-
-        // 3. Bone Meal Interaction (AOE Fertilizing, strictly on farm targets)
-        if (heldItem.is(Items.BONE_MEAL)) {
-            boolean isFarmTarget = FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
-                    || FarmingManager.isBonemealCrop(clickedState)
-                    || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))
-                    || FarmingManager.isSmallFlower(clickedState);
-            if (!isFarmTarget) {
-                return; // Do NOT trigger mass bone meal on wild grass blocks!
+                if (!plantingOnEmptySoil && (isDirectCrop || isSoil || isAboveCrop)) {
+                    BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
+                    boolean handled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
+                    if (handled) {
+                        LAST_RIGHT_CLICK_TICK.put(player.getUUID(), currentTick);
+                        event.setCancellationResult(InteractionResult.SUCCESS);
+                        event.setCanceled(true);
+                        return;
+                    }
+                }
             }
 
-            boolean handled = FarmingManager.handleMassBoneMeal(serverPlayer, hand, heldItem, clickedPos);
-            if (handled) {
-                event.setCancellationResult(InteractionResult.SUCCESS);
-                event.setCanceled(true);
+            // If hand is empty and harvest didn't trigger, nothing more to do
+            if (heldItem.isEmpty()) {
                 return;
             }
 
-            // If bone meal could not fertilize anything (all mature), harvest them
-            boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState);
-            boolean isFarmland = FarmingManager.isFarmland(clickedState);
-            boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
-                    || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
-                    || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()));
-            if (isDirectCrop || isFarmland || isAboveCrop) {
-                BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
-                boolean harvestHandled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
-                if (harvestHandled) {
+            // 1. Hoe Interaction (Mass Tilling)
+            if (isHoe(heldItem)) {
+                boolean handled = FarmingManager.handleMassHoe(serverPlayer, hand, heldItem, clickedPos);
+                if (handled) {
+                    LAST_RIGHT_CLICK_TICK.put(player.getUUID(), currentTick);
                     event.setCancellationResult(InteractionResult.SUCCESS);
                     event.setCanceled(true);
                 }
+                return;
             }
-            return;
+
+            // 2. Planting Interaction (Mass Planting)
+            if (FarmingManager.isPlantableSeed(heldItem)) {
+                boolean handled = FarmingManager.handleMassPlanting(serverPlayer, hand, heldItem, clickedPos);
+                if (handled) {
+                    LAST_RIGHT_CLICK_TICK.put(player.getUUID(), currentTick);
+                    event.setCancellationResult(InteractionResult.SUCCESS);
+                    event.setCanceled(true);
+                } else if (FarmingManager.isSapling(heldItem) && FarmingConfig.isSmartSaplingEnabled()) {
+                    // If smart sapling planting could not find enough space to plant a group/grove,
+                    // cancel the event so vanilla does NOT sneak-place a single lonely sapling!
+                    event.setCancellationResult(InteractionResult.FAIL);
+                    event.setCanceled(true);
+                }
+                return;
+            }
+
+            // 3. Bone Meal Interaction (AOE Fertilizing, strictly on farm targets)
+            if (heldItem.is(Items.BONE_MEAL)) {
+                boolean isFarmTarget = FarmingManager.isCrop(clickedState) || FarmingManager.isFarmland(clickedState)
+                        || FarmingManager.isBonemealCrop(clickedState)
+                        || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))
+                        || FarmingManager.isSmallFlower(clickedState);
+                if (!isFarmTarget) {
+                    return; // Do NOT trigger mass bone meal on wild grass blocks!
+                }
+
+                boolean handled = FarmingManager.handleMassBoneMeal(serverPlayer, hand, heldItem, clickedPos);
+                if (handled) {
+                    LAST_RIGHT_CLICK_TICK.put(player.getUUID(), currentTick);
+                    event.setCancellationResult(InteractionResult.SUCCESS);
+                    event.setCanceled(true);
+                    return;
+                }
+
+                // If bone meal could not fertilize anything (all mature), harvest them
+                boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState);
+                boolean isFarmland = FarmingManager.isFarmland(clickedState);
+                boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
+                        || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
+                        || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()));
+                if (isDirectCrop || isFarmland || isAboveCrop) {
+                    BlockPos targetCrop = isDirectCrop ? clickedPos : clickedPos.above();
+                    boolean harvestHandled = FarmingManager.handleMassHarvest(serverPlayer, hand, heldItem, targetCrop);
+                    if (harvestHandled) {
+                        LAST_RIGHT_CLICK_TICK.put(player.getUUID(), currentTick);
+                        event.setCancellationResult(InteractionResult.SUCCESS);
+                        event.setCanceled(true);
+                    }
+                }
+                return;
+            }
+        } catch (Throwable t) {
+            VeinFarmingMod.LOGGER.error("Vein Farming: Error during right-click interaction handling", t);
+        } finally {
+            IS_HANDLING_RIGHT_CLICK.set(false);
         }
     }
 
@@ -279,6 +309,7 @@ public class FarmingEventHandler {
     public void onPlayerLoggedOut(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
         ACTIVE_KEYS.remove(event.getEntity().getUUID());
         SMART_PLANT_ENABLED.remove(event.getEntity().getUUID());
+        LAST_RIGHT_CLICK_TICK.remove(event.getEntity().getUUID());
     }
 
     public static boolean isHoe(ItemStack stack) {

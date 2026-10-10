@@ -35,7 +35,32 @@ public class VeinFarmingMod {
             );
         }
 
+        preloadClasses();
+
         LOGGER.info("Vein Farming: Universal Crop Harvester initialized successfully!");
+    }
+
+    private static void preloadClasses() {
+        Class<?>[] classes = new Class<?>[]{
+                FarmingConfig.class,
+                PlantClassifier.class,
+                PlantingAlgorithms.class,
+                HarvestManager.class,
+                PlantingManager.class,
+                TillingAndFertilizingManager.class,
+                FarmingManager.class,
+                ModAdvancements.class,
+                LiteMinerCompat.class,
+                FTBUltimineCompat.class,
+                FarmingEventHandler.class
+        };
+        for (Class<?> clazz : classes) {
+            try {
+                Class.forName(clazz.getName(), true, VeinFarmingMod.class.getClassLoader());
+            } catch (Throwable t) {
+                LOGGER.warn("Vein Farming: Preloading class {} encountered note: {}", clazz.getName(), t.getMessage());
+            }
+        }
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {

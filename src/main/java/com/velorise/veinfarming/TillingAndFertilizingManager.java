@@ -647,7 +647,12 @@ public class TillingAndFertilizingManager {
                 if (!added || !boneMealStack.isEmpty()) {
                     Block.popResource(serverLevel, composterPos.above(), boneMealStack);
                 }
-                player.containerMenu.broadcastChanges();
+                try {
+                    if (player.containerMenu != null) {
+                        player.containerMenu.broadcastChanges();
+                    }
+                } catch (Throwable ignored) {
+                }
             } else {
                 Block.popResource(serverLevel, composterPos.above(), boneMealStack);
             }
