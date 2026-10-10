@@ -186,7 +186,7 @@ No third-party configuration mods (like *Configured* or *Cloth Config*) required
 * Frequently adjusted gameplay settings appear prominently at the top:
   - **Sapling Minimum Spacing** (Slider: 0-8)
   - **Flower & Flora Sparsity** (Slider: 0-5)
-  - **Maximum Blocks Affected** (Slider: 1-1024, default: 128)
+  - **Maximum Blocks Affected** (Slider: 16-512, default: 91 - covers full 9x9 farm plot + border)
   - **Farming Radius** (Slider: 1-32, default: 8)
   - **Water Irrigation Hole Spacing** (Slider: 8-16, default: 8)
   - **Water Bucket Irrigation** (Toggle, default: ON)
@@ -204,8 +204,8 @@ The configuration is saved automatically at `.minecraft/config/vein_farming-comm
   sapling_min_spacing = 4
   # Flora & Flower sparsity level (0 = OFF / Dense carpet, 1-5 = Organic meadow noise, default: 3)
   flower_sparsity = 3
-  # Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action (1-1024, default: 128)
-  max_blocks = 128
+  # Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action (1-512, default: 91)
+  max_blocks = 91
   # Maximum horizontal radius from the clicked block (1-32, default: 8)
   farming_radius = 8
   # Minimum spacing between automated water irrigation holes in blocks (8-16, default: 8)

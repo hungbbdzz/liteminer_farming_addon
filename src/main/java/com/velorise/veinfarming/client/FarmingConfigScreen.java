@@ -121,7 +121,7 @@ public class FarmingConfigScreen extends Screen {
     private void resetDefaults() {
         this.saplingSpacing = 4;
         this.flowerSparsity = 3;
-        this.maxBlocks = 64;
+        this.maxBlocks = 91;
         this.farmingRadius = 8;
         this.harvestToInventory = false;
         this.standalonePreview = true;

@@ -65,8 +65,8 @@ public class FarmingConfig {
                 .defineInRange("flower_sparsity", 3, 0, 5);
 
         MAX_BLOCKS = builder
-                .comment("Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action.")
-                .defineInRange("max_blocks", 64, 1, 512);
+                .comment("Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action. Default: 91 (covers standard 9x9 farm plot + border).")
+                .defineInRange("max_blocks", 91, 1, 512);
 
         FARMING_RADIUS = builder
                 .comment("Maximum horizontal radius from the clicked block.")
