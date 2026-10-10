@@ -3,6 +3,7 @@ package com.velorise.veinfarming;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -820,9 +821,86 @@ public class PlantingAlgorithms {
     }
 
     /**
+     * Checks if a candidate position is too close to any existing or planned water sources.
+     * Enforces strict Chebyshev distance >= minSpacing (minimum 8 blocks).
+     * If max(|dx|, |dz|) < minSpacing, their 9x9 hydration zones overlap, so it is strictly rejected.
+     */
+    public static boolean isTooCloseToWater(BlockPos cand, Collection<BlockPos> waterSources, int minSpacing) {
+        if (cand == null || waterSources == null || waterSources.isEmpty()) {
+            return false;
+        }
+        for (BlockPos w : waterSources) {
+            int dx = Math.abs(cand.getX() - w.getX());
+            int dz = Math.abs(cand.getZ() - w.getZ());
+            if (Math.max(dx, dz) < minSpacing) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Scans for existing water sources in the world within the vicinity of the bounding box.
+     */
+    public static List<BlockPos> findNearbyWorldWater(Level level, Collection<BlockPos> positions, int searchRadius) {
+        if (level == null || positions == null || positions.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+        int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPos p : positions) {
+            minX = Math.min(minX, p.getX());
+            maxX = Math.max(maxX, p.getX());
+            minY = Math.min(minY, p.getY());
+            maxY = Math.max(maxY, p.getY());
+            minZ = Math.min(minZ, p.getZ());
+            maxZ = Math.max(maxZ, p.getZ());
+        }
+
+        int scanMinX = minX - searchRadius;
+        int scanMaxX = maxX + searchRadius;
+        int scanMinZ = minZ - searchRadius;
+        int scanMaxZ = maxZ + searchRadius;
+        int scanMinY = minY - 2;
+        int scanMaxY = maxY + 2;
+
+        List<BlockPos> waters = new ArrayList<>();
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = scanMinX; x <= scanMaxX; x++) {
+            for (int z = scanMinZ; z <= scanMaxZ; z++) {
+                cursor.set(x, minY, z);
+                if (!level.hasChunkAt(cursor)) {
+                    continue;
+                }
+                for (int y = scanMinY; y <= scanMaxY; y++) {
+                    cursor.set(x, y, z);
+                    if (level.getFluidState(cursor).is(FluidTags.WATER) || level.getBlockState(cursor).is(Blocks.WATER)) {
+                        waters.add(cursor.immutable());
+                    }
+                }
+            }
+        }
+        return waters;
+    }
+
+    /**
      * Calculates optimal water hole locations for tilling/irrigation when holding a Hoe and Water Bucket.
-     * Places a water hole at the middle/center if unhydrated, and adds extra water holes spaced 8 blocks
-     * apart across large areas to ensure full 100% moisture coverage without dry gaps.
+     *
+     * 2-Layer Optimization:
+     * Layer 1: Farm Grid Alignment & Coordinate Anchoring
+     *   - Detects all existing water sources in the nearby world.
+     *   - If an existing water source is nearby, anchors the grid directly to that existing water source,
+     *     ensuring the new field continues the exact same orthogonal farm grid.
+     *   - If no existing water source is found, centers the optimal grid over the tilled area
+     *     to maximize full 9x9 coverage with minimum water holes.
+     *
+     * Layer 2: Strict Spacing & Zero Redundant Overlap
+     *   - Strictly enforces max(|dx|, |dz|) >= minSpacing (minimum 8 blocks) against ALL water sources:
+     *     both existing world water sources and newly selected water holes.
+     *   - Rejects any candidate that would overlap with existing or planned water supply zones.
+     *   - Preserves maximum farmland surface while guaranteeing full moisture coverage without dry gaps.
      */
     public static List<BlockPos> calculateOptimalWaterHoles(
             Level level,
@@ -830,14 +908,32 @@ public class PlantingAlgorithms {
             BlockPos clickedPos,
             int maxWaterHoles
     ) {
-        if (tilledPositions == null || tilledPositions.size() < 2 || maxWaterHoles <= 0) {
+        if (tilledPositions == null || tilledPositions.size() < 2 || maxWaterHoles <= 0 || level == null) {
             return Collections.emptyList();
         }
 
-        // 1. Identify which positions are NOT yet hydrated by existing world water
+        int minSpacing = FarmingConfig.WATER_HOLE_SPACING.get();
+        if (minSpacing < 8) {
+            minSpacing = 8;
+        }
+
+        // 1. Scan for existing water sources in the world nearby (within 12 blocks)
+        List<BlockPos> existingWorldWaters = findNearbyWorldWater(level, tilledPositions, 12);
+
+        // 2. Identify which positions are NOT yet hydrated by existing world water
         Set<BlockPos> unhydrated = new HashSet<>();
         for (BlockPos pos : tilledPositions) {
-            if (!PlantClassifier.isNearWater(level, pos)) {
+            boolean hydrated = false;
+            for (BlockPos w : existingWorldWaters) {
+                int dx = Math.abs(pos.getX() - w.getX());
+                int dz = Math.abs(pos.getZ() - w.getZ());
+                int dy = w.getY() - pos.getY();
+                if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
+                    hydrated = true;
+                    break;
+                }
+            }
+            if (!hydrated) {
                 unhydrated.add(pos);
             }
         }
@@ -846,7 +942,7 @@ public class PlantingAlgorithms {
             return Collections.emptyList();
         }
 
-        // 2. Find bounding box of tilled positions to locate geometric center
+        // 3. Find bounding box of tilled positions
         int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
         int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
         for (BlockPos pos : tilledPositions) {
@@ -855,113 +951,169 @@ public class PlantingAlgorithms {
             minZ = Math.min(minZ, pos.getZ());
             maxZ = Math.max(maxZ, pos.getZ());
         }
-        double midX = (minX + maxX) / 2.0;
-        double midZ = (minZ + maxZ) / 2.0;
 
-        // 3. Find the best center block among tilled positions closest to (midX, midZ)
-        BlockPos centerPos = null;
-        double bestDistSq = Double.MAX_VALUE;
-        for (BlockPos pos : tilledPositions) {
-            if (!level.getBlockState(pos.below()).isSolid()) {
-                continue;
-            }
-            double dx = pos.getX() - midX;
-            double dz = pos.getZ() - midZ;
-            double distSq = dx * dx + dz * dz;
-            if (distSq < bestDistSq) {
-                bestDistSq = distSq;
-                centerPos = pos;
+        // 4. Determine Grid Origin (Layer 1)
+        BlockPos anchorWater = null;
+        double bestAnchorDistSq = Double.MAX_VALUE;
+        for (BlockPos w : existingWorldWaters) {
+            double d = w.distSqr(clickedPos);
+            if (d < bestAnchorDistSq) {
+                bestAnchorDistSq = d;
+                anchorWater = w;
             }
         }
-        if (centerPos == null) {
-            centerPos = clickedPos;
-        }
 
-        // 4. Generate candidate 8-block grid positions centered at centerPos
-        int radiusX = Math.max(1, (maxX - minX + 8) / 8);
-        int radiusZ = Math.max(1, (maxZ - minZ + 8) / 8);
+        int originX;
+        int originZ;
+        if (anchorWater != null) {
+            originX = anchorWater.getX();
+            originZ = anchorWater.getZ();
+        } else {
+            int width = maxX - minX + 1;
+            int height = maxZ - minZ + 1;
+            if (width <= 9) {
+                originX = minX + width / 2;
+            } else {
+                int kx = Math.max(1, (int) Math.round((width - 9.0) / minSpacing) + 1);
+                int marginX = Math.max(0, (width - ((kx - 1) * minSpacing + 1)) / 2);
+                originX = minX + marginX;
+            }
 
-        List<BlockPos> candidates = new ArrayList<>();
-        // Center position is candidate 0
-        candidates.add(centerPos);
-
-        List<int[]> gridOffsets = new ArrayList<>();
-        for (int i = -radiusX; i <= radiusX; i++) {
-            for (int j = -radiusZ; j <= radiusZ; j++) {
-                if (i == 0 && j == 0) continue;
-                gridOffsets.add(new int[]{i, j});
+            if (height <= 9) {
+                originZ = minZ + height / 2;
+            } else {
+                int kz = Math.max(1, (int) Math.round((height - 9.0) / minSpacing) + 1);
+                int marginZ = Math.max(0, (height - ((kz - 1) * minSpacing + 1)) / 2);
+                originZ = minZ + marginZ;
             }
         }
-        gridOffsets.sort(Comparator.comparingInt(o -> (o[0] * o[0] + o[1] * o[1])));
 
-        for (int[] offset : gridOffsets) {
-            int targetX = centerPos.getX() + offset[0] * 8;
-            int targetZ = centerPos.getZ() + offset[1] * 8;
+        // 5. Generate Ideal Grid Targets
+        int minGridI = (int) Math.floor((minX - originX - 4.0) / minSpacing);
+        int maxGridI = (int) Math.ceil((maxX - originX + 4.0) / minSpacing);
+        int minGridJ = (int) Math.floor((minZ - originZ - 4.0) / minSpacing);
+        int maxGridJ = (int) Math.ceil((maxZ - originZ + 4.0) / minSpacing);
 
-            BlockPos bestCandidate = null;
-            double bestDist = Double.MAX_VALUE;
+        List<int[]> idealGridPoints = new ArrayList<>();
+        for (int i = minGridI; i <= maxGridI; i++) {
+            for (int j = minGridJ; j <= maxGridJ; j++) {
+                idealGridPoints.add(new int[]{originX + i * minSpacing, originZ + j * minSpacing});
+            }
+        }
+        idealGridPoints.sort(Comparator.comparingDouble(gp -> {
+            double dx = gp[0] - clickedPos.getX();
+            double dz = gp[1] - clickedPos.getZ();
+            return dx * dx + dz * dz;
+        }));
+
+        // 6. Map ideal grid points to best available candidate positions in tilledPositions
+        List<BlockPos> candidatePositions = new ArrayList<>();
+        for (int[] gp : idealGridPoints) {
+            int targetX = gp[0];
+            int targetZ = gp[1];
+
+            BlockPos bestCand = null;
+            double bestDistSq = Double.MAX_VALUE;
+
             for (BlockPos pos : tilledPositions) {
+                if (!level.getBlockState(pos.below()).isSolid()) {
+                    continue;
+                }
+                if (isTooCloseToWater(pos, existingWorldWaters, minSpacing)) {
+                    continue;
+                }
+
                 int dx = Math.abs(pos.getX() - targetX);
                 int dz = Math.abs(pos.getZ() - targetZ);
-                if (dx <= 1 && dz <= 1 && level.getBlockState(pos.below()).isSolid()) {
+                if (dx <= 2 && dz <= 2) {
                     double d = dx * dx + dz * dz;
-                    if (d < bestDist) {
-                        bestDist = d;
-                        bestCandidate = pos;
+                    if (d < bestDistSq) {
+                        bestDistSq = d;
+                        bestCand = pos;
                     }
                 }
             }
-            if (bestCandidate != null && !candidates.contains(bestCandidate)) {
-                candidates.add(bestCandidate);
+
+            if (bestCand != null && !candidatePositions.contains(bestCand)) {
+                candidatePositions.add(bestCand);
             }
         }
 
-        // 5. Greedy set cover: select water holes that maximize unhydrated coverage
+        // Fallback candidates for irregular shapes
+        List<BlockPos> fallbackCandidates = new ArrayList<>();
+        for (BlockPos pos : tilledPositions) {
+            if (!candidatePositions.contains(pos) && level.getBlockState(pos.below()).isSolid()) {
+                if (!isTooCloseToWater(pos, existingWorldWaters, minSpacing)) {
+                    fallbackCandidates.add(pos);
+                }
+            }
+        }
+        fallbackCandidates.sort(Comparator.comparingInt(pos -> pos.distManhattan(clickedPos)));
+        candidatePositions.addAll(fallbackCandidates);
+
+        // 7. Greedy Selection with Strict Minimum Spacing Enforcement (Layer 2)
         Set<BlockPos> covered = new HashSet<>();
         List<BlockPos> selectedHoles = new ArrayList<>();
 
-        for (BlockPos cand : candidates) {
-            if (selectedHoles.size() >= maxWaterHoles) {
-                break;
-            }
+        while (selectedHoles.size() < maxWaterHoles && covered.size() < unhydrated.size()) {
+            BlockPos bestChoice = null;
+            int maxNewlyCovered = 0;
+            double bestDistToGrid = Double.MAX_VALUE;
 
-            int newlyCovered = 0;
-            for (BlockPos u : unhydrated) {
-                if (!covered.contains(u)) {
-                    int dx = Math.abs(u.getX() - cand.getX());
-                    int dz = Math.abs(u.getZ() - cand.getZ());
-                    int dy = cand.getY() - u.getY();
-                    if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
-                        newlyCovered++;
-                    }
-                }
-            }
-
-            if (newlyCovered > 0) {
-                boolean spacingOk = true;
-                for (BlockPos existing : selectedHoles) {
-                    int dx = Math.abs(cand.getX() - existing.getX());
-                    int dz = Math.abs(cand.getZ() - existing.getZ());
-                    if (Math.max(dx, dz) < 7) {
-                        spacingOk = false;
-                        break;
-                    }
+            for (BlockPos cand : candidatePositions) {
+                if (selectedHoles.contains(cand)) {
+                    continue;
                 }
 
-                if (spacingOk) {
-                    selectedHoles.add(cand);
-                    for (BlockPos u : unhydrated) {
+                // STRICT RULE 1: Never closer than minSpacing to ANY existing water in the world
+                if (isTooCloseToWater(cand, existingWorldWaters, minSpacing)) {
+                    continue;
+                }
+
+                // STRICT RULE 2: Never closer than minSpacing to ANY newly selected water hole
+                if (isTooCloseToWater(cand, selectedHoles, minSpacing)) {
+                    continue;
+                }
+
+                // Count how many currently unhydrated blocks this candidate will cover
+                int newlyCovered = 0;
+                for (BlockPos u : unhydrated) {
+                    if (!covered.contains(u)) {
                         int dx = Math.abs(u.getX() - cand.getX());
                         int dz = Math.abs(u.getZ() - cand.getZ());
                         int dy = cand.getY() - u.getY();
                         if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
-                            covered.add(u);
+                            newlyCovered++;
                         }
                     }
+                }
 
-                    if (covered.size() >= unhydrated.size()) {
-                        break;
+                if (newlyCovered > 0) {
+                    int modX = Math.abs(Math.floorMod(cand.getX() - originX, minSpacing));
+                    if (modX > minSpacing / 2) modX = minSpacing - modX;
+                    int modZ = Math.abs(Math.floorMod(cand.getZ() - originZ, minSpacing));
+                    if (modZ > minSpacing / 2) modZ = minSpacing - modZ;
+                    double gridOffsetDist = modX * modX + modZ * modZ;
+
+                    if (newlyCovered > maxNewlyCovered || (newlyCovered == maxNewlyCovered && gridOffsetDist < bestDistToGrid)) {
+                        maxNewlyCovered = newlyCovered;
+                        bestDistToGrid = gridOffsetDist;
+                        bestChoice = cand;
                     }
+                }
+            }
+
+            if (bestChoice == null || maxNewlyCovered == 0) {
+                break;
+            }
+
+            selectedHoles.add(bestChoice);
+            for (BlockPos u : unhydrated) {
+                int dx = Math.abs(u.getX() - bestChoice.getX());
+                int dz = Math.abs(u.getZ() - bestChoice.getZ());
+                int dy = bestChoice.getY() - u.getY();
+                if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
+                    covered.add(u);
                 }
             }
         }

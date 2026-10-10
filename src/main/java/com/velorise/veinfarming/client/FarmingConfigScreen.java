@@ -44,6 +44,7 @@ public class FarmingConfigScreen extends Screen {
     private boolean preventToolBreaking;
     private boolean clearFoliage;
     private boolean smartWaterBucketIrrigation;
+    private int waterHoleSpacing;
     private boolean batchComposter;
     private boolean smartBonemeal;
     private boolean preventTrample;
@@ -75,6 +76,7 @@ public class FarmingConfigScreen extends Screen {
         this.preventToolBreaking = FarmingConfig.PREVENT_TOOL_BREAKING.get();
         this.clearFoliage = FarmingConfig.CLEAR_FOLIAGE.get();
         this.smartWaterBucketIrrigation = FarmingConfig.SMART_WATER_BUCKET_IRRIGATION.get();
+        this.waterHoleSpacing = FarmingConfig.WATER_HOLE_SPACING.get();
         this.batchComposter = FarmingConfig.BATCH_COMPOSTER.get();
         this.smartBonemeal = FarmingConfig.SMART_BONEMEAL.get();
         this.preventTrample = FarmingConfig.PREVENT_FARMLAND_TRAMPLE.get();
@@ -101,6 +103,7 @@ public class FarmingConfigScreen extends Screen {
         FarmingConfig.PREVENT_TOOL_BREAKING.set(this.preventToolBreaking);
         FarmingConfig.CLEAR_FOLIAGE.set(this.clearFoliage);
         FarmingConfig.SMART_WATER_BUCKET_IRRIGATION.set(this.smartWaterBucketIrrigation);
+        FarmingConfig.WATER_HOLE_SPACING.set(this.waterHoleSpacing);
         FarmingConfig.BATCH_COMPOSTER.set(this.batchComposter);
         FarmingConfig.SMART_BONEMEAL.set(this.smartBonemeal);
         FarmingConfig.PREVENT_FARMLAND_TRAMPLE.set(this.preventTrample);
@@ -129,6 +132,7 @@ public class FarmingConfigScreen extends Screen {
         this.preventToolBreaking = true;
         this.clearFoliage = true;
         this.smartWaterBucketIrrigation = true;
+        this.waterHoleSpacing = 8;
         this.batchComposter = true;
         this.smartBonemeal = true;
         this.preventTrample = true;
@@ -260,6 +264,12 @@ public class FarmingConfigScreen extends Screen {
                 "Water Bucket Irrigation", this.smartWaterBucketIrrigation,
                 "When holding a Hoe (main) and Water Bucket (off), automatically digs 8-block spaced water holes in dry soil.",
                 val -> this.smartWaterBucketIrrigation = val));
+
+        // 14. Water Hole Spacing Slider (8..16 blocks)
+        this.list.addConfigEntry(new IntSlider(0, 0, widgetWidth, widgetHeight,
+                "Irrigation Spacing", "blocks", 8, 16, this.waterHoleSpacing, null,
+                "Minimum spacing between water irrigation holes. 8+ blocks ensures non-overlapping moisture zones.",
+                val -> this.waterHoleSpacing = val));
 
         // 14. Batch Composter (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
