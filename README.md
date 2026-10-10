@@ -5,9 +5,9 @@
 [![GitHub](https://img.shields.io/badge/GitHub-hungbbdzz%2Fvein--farming-blue.svg)](https://github.com/hungbbdzz/vein-farming)
 
 The ultimate universal AOE farming mod for **NeoForge 1.21.1**.  
-Built as a seamless companion for **[LiteMiner](https://modrinth.com/mod/liteminer)** and **[FTB Ultimine](https://modrinth.com/mod/ftb-ultimine)**, with full **Standalone Mode** support featuring its own client-side highlight outline preview!
+Built as a seamless companion for **[LiteMiner](https://modrinth.com/mod/liteminer)** and **[FTB Ultimine](https://modrinth.com/mod/ftb-ultimine)**, with full **Standalone Mode** support featuring its own client-side in-world highlight outline preview!
 
-Brings **Area Tilling**, **Smart Mass Planting with Advanced Spatial Algorithms**, **AOE Bone Meal**, **Root-Preserving Column Crop Harvesting**, **Stem-Protected Fruit Harvesting**, **Mass Destruction Mode**, **Batch Composting**, and **Auto-Replanting** to Minecraft!
+Brings **Area Tilling**, **Smart Water Bucket Irrigation (2-Pass Hybrid Grid)**, **Smart Mass Planting with Spatial Geometry**, **AOE Bone Meal**, **Bedrock-Style Flower Propagation**, **Root-Preserving Column Crop Harvesting**, **Stem-Protected Fruit Harvesting**, **Mass Destruction Mode with Drop Aggregation**, **Batch Composting**, **Custom Advancements**, and **Auto-Replanting** to Minecraft!
 
 ---
 
@@ -17,7 +17,7 @@ All keybindings can be customized in the standard Minecraft **Options -> Control
 
 | Keybind | Default Key | Description |
 | :--- | :--- | :--- |
-| **Farming Veinmine / Mass Action** | `Left Shift` | Hold to activate mass farming actions (tilling, planting, harvesting, bone meal, destroying). When LiteMiner or FTB Ultimine is installed, their activation keys also trigger mass actions. |
+| **Farming Veinmine / Mass Action** | `Left Shift` | Hold to activate mass farming actions (tilling, irrigation, planting, harvesting, bone meal, destroying). When LiteMiner or FTB Ultimine is installed, their activation keys also trigger mass actions. |
 | **Toggle Smart Planting** | *Unbound* (None) | Instantly toggle between **Smart Planting** (spatial algorithms active) and **Uniform Carpet Planting** (plants all viable soils without spacing/layout filters). Displays an action bar message and immediately updates the client preview! |
 
 ---
@@ -33,7 +33,19 @@ All keybindings can be customized in the standard Minecraft **Options -> Control
 
 ---
 
-### 🌱 2. Smart Mass Planting (Seeds & Crops)
+### 💧 2. Smart Water Bucket Irrigation (Civil Engineering)
+Tired of manually digging water holes and placing buckets to hydrate massive farms? Vein Farming introduces an automated, mathematically optimal water irrigation system:
+
+* **How to Trigger:** Hold any **Hoe in Main Hand** and a **Water Bucket** (or any fluid container filled with water) in **Off Hand**. Hold the activation key and **Right-click** tillable soil.
+* **2-Pass Hybrid Optimization Grid:**
+  1. **Pass 1 (Strict 8-Block Spacing Grid):** Places water source blocks strictly spaced $\ge 8$ blocks apart (Chebyshev distance). Automatically anchors to existing world water sources or centers over the field to ensure zero overlapping hydration zones and maximize plantable farmland surface.
+  2. **Pass 2 (Full Coverage Rescue):** If irregular farm borders, narrow peninsulas, or tight pockets would otherwise leave dead unwatered zones, Pass 2 automatically places centered rescue water holes to **guarantee 100% of your farmland is hydrated** without dead dry dirt!
+* **Resource Consumption:** Consumes 1 water source per placed water hole (from off-hand first, then player inventory). In Creative Mode, water is infinite.
+* **Real-Time Preview:** When standalone preview is active, intended water holes are rendered in **Azure Cyan wireframe**!
+
+---
+
+### 🌱 3. Smart Mass Planting (Seeds & Crops)
 Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-plant seeds and crops!
 
 * **Universal Crop Support:** Wheat, Carrot, Potato, Beetroot, Torchflower, Pitcher Pod, Nether Wart, Bamboo, Sugar Cane, Cactus, Kelp, Chorus Flower, Cocoa Beans, etc.
@@ -61,13 +73,13 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
    * Right-click on Jungle Logs with Cocoa Beans to plant them on all available horizontal bark faces!
 6. **🔄 Context-Aware Intercropping (`smart_intercropping`):**
    * Hold one crop in your **Main Hand** (e.g., Carrot) and another in your **Off Hand** (e.g., Potato).
-   * Plants strictly **alternating rows** (Carrot row, Potato row, Carrot row...) to grant the vanilla crop growth speed bonus!
+   * Plants strictly **alternating parallel rows** (Carrot row, Potato row, Carrot row...) to grant the vanilla crop growth speed bonus (up to 200% speed)!
    * Automatically synchronizes row parity with existing planted crops in the farm.
    * Fruit seeds (Melon/Pumpkin) are strictly excluded from being forced into intercropping.
 
 ---
 
-### 🦴 3. AOE Bone Meal (Smart Fertilizing & Flower Propagation)
+### 🦴 4. AOE Bone Meal (Smart Fertilizing & Flower Propagation)
 * Hold **Bone Meal** and **Right-click** on crops or flowers.
 * **Smart Area Growth:** Even if the clicked crop is already mature, Bone Meal will automatically bypass it and continue fertilizing all other growing crops in the area until they reach 100% maturity!
 * **🌸 Bedrock-Style Flower Propagation (`bedrock_flower_bonemeal`):**
@@ -78,7 +90,7 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
 
 ---
 
-### 🌾 4. Universal Mass Harvesting & Auto-Replanting
+### 🌾 5. Universal Mass Harvesting & Auto-Replanting
 * **Right-click** on crops or farmland with an empty hand or tool.
 * **Auto-Replant:** Automatically harvests mature crops and replants them at age 0 using dropped or inventory seeds!
 * **Immature Crop Safety:** Immature crops are strictly preserved.
@@ -91,46 +103,75 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
 
 ---
 
-### 🪓 5. Mass Destruction Mode (Farm Plot Clearing)
+### 🪓 6. Mass Destruction Mode (Left-Click Farm Clearing)
 * Hold **Sneak (`Shift`)** (or your miner mod key) and **Left-click (Mine)** a crop while holding any tool (**Axe, Pickaxe, Shovel, Hoe, Knife, Shears**).
-* Completely clears all connected agricultural crops, stems, and column roots **without replanting**, allowing you to completely redesign or wipe farm plots in seconds!
+* Completely clears all connected agricultural crops, stems, and column roots **without replanting**, allowing you to completely wipe farm plots in seconds!
+* **Clean Drop Aggregation:**
+  - If `harvest_to_inventory` is enabled, all drops from the broken vein are deposited directly into your inventory.
+  - If `collect_drops_at_target` is enabled, all drops are merged and dropped neatly right at the block you hit, instead of scattering across the field!
 * Strictly restricted to agricultural plants—will never accidentally break stone, dirt, or ores.
 
 ---
 
-### 🍂 6. Batch Composting
+### 🍂 7. Batch Composting
 * Right-click a **Composter** while holding compostable items.
 * Instantly processes up to **128 items** from your hand and inventory in a single click, popping Bone Meal directly into your inventory or above the composter!
 
 ---
 
-### 🛡️ 7. Farmland Trample Prevention
+### 🛡️ 8. Farmland Trample Prevention
 * Built-in protection preventing Farmland (`#farmland`) from turning back to dirt when players or mobs jump or land on it! Configurable via `prevent_farmland_trample`.
 
 ---
 
-### 👁️ 8. Standalone Real-Time 3D Wireframe Preview
+### 👁️ 9. Standalone Real-Time 3D Wireframe Preview
 When LiteMiner is not installed, the mod renders its own client-side **wireframe bounding box highlight** on target blocks when holding Sneak or the activation key:
 * 🌾 **Golden Amber:** Mass Harvesting
 * 🌿 **Sprout Green:** Mass Planting
+* 💧 **Azure Cyan:** Smart Water Irrigation Holes
 * 🛑 **Crimson Red:** Mass Destruction
 * 💎 **Emerald Jade:** Bone Meal Fertilizing
 * 🟫 **Earth Brown:** Area Tilling (Hoe)
 
 ---
 
+### 🏆 10. Custom Advancements Tree
+Vein Farming includes a built-in custom Advancement tree to guide and reward players:
+
+| Advancement | Icon | Description |
+| :--- | :--- | :--- |
+| **It Ain't Much, But It's Honest Work** | Diamond Hoe | Perform your first mass farming action with Vein Farming (Root). |
+| **Lazy Farmer 3000** | Golden Hoe | Harvest 64 or more mature crops in a single instant click. |
+| **Crop Rotation Genius** | Beetroot | Plant alternating parallel rows of crops by holding different seeds in each hand for 200% growth speed. |
+| **Civil Engineer** | Water Bucket | Irrigate a field by holding a Hoe and Water Bucket, automatically digging spaced water wells. |
+| **Is it Bedrock?** | Poppy | Duplicate a small flower with Bone Meal... wait, since when can we do this in Java?! |
+| **The Lorax Approves** | Oak Sapling | Plant a spacious sapling orchard or a 2x2 mega tree grove using smart spacing. |
+| **Speedrun Composting** | Composter | Shift-click a Composter with seeds or compostables to convert entire stacks into Bone Meal instantly. |
+| **Living on the Edge** | Iron Hoe | Have your farming tool saved from breaking at exactly 1 durability. |
+
+---
+
+### ⚡ 11. Performance, Fast-Click & Re-Entrancy Protection
+* **Tick Debouncing:** Protects against rapid spam-clicking, macro clickers, and dual-wield packet races within the same tick.
+* **Re-entrancy Guard:** Employs thread-local execution locks preventing duplicate event cascades.
+* **Eager JVM Class Preloading:** All core classes are initialized at mod startup, eliminating lazy classloader latency and preventing file-lock issues.
+* **Top-level Crash Resilience:** All event handlers are safeguarded against unhandled exceptions, protecting server tick loops from crashes.
+
+---
+
 ## 🏛️ Modular Code Architecture
 
-The codebase has been refactored from a monolithic class into a decoupled, high-performance modular architecture:
+The codebase follows a decoupled, high-performance modular architecture:
 
 | Class | Responsibility |
 | :--- | :--- |
-| **`PlantClassifier.java`** | Universal tags, block & item categorization, soil validation, and crop maturity logic. |
-| **`PlantingAlgorithms.java`** | Spatial layout algorithms: 2x2 sapling groves, cactus bipartite MIS, fruit stem 40/40 layouts, organic flora meadow noise, and intercropping row parity. |
+| **`PlantClassifier.java`** | Universal tags, block & item categorization, soil validation, fluid container detection, and crop maturity logic. |
+| **`PlantingAlgorithms.java`** | Spatial layout algorithms: 2x2 sapling groves, 2-pass hybrid water irrigation grid, cactus bipartite MIS, fruit stem 40/40 layouts, organic flora meadow noise, and intercropping row parity. |
 | **`PlantingManager.java`** | Mass planting execution, Cocoa Bean log wrapping, and BFS candidate search. |
-| **`HarvestManager.java`** | Mass harvesting, auto-replanting, left-click destruction, and harvest BFS search. |
-| **`TillingAndFertilizingManager.java`** | Mass hoe tilling, AOE bone meal fertilizing, and batch composting. |
+| **`HarvestManager.java`** | Mass harvesting, auto-replanting, left-click destruction with drop aggregation, and harvest BFS search. |
+| **`TillingAndFertilizingManager.java`** | Mass hoe tilling, smart water bucket irrigation placement, AOE bone meal fertilizing, and batch composting. |
 | **`FarmingManager.java`** | High-level facade delegating to the domain managers while preserving 100% backward compatibility for external callers. |
+| **`ModAdvancements.java`** | Custom advancement criteria trigger and dispatching. |
 
 ---
 
@@ -141,7 +182,17 @@ No third-party configuration mods (like *Configured* or *Cloth Config*) required
 * Go to Minecraft's **Mods** menu (`Esc` -> `Mods`).
 * Select **Vein Farming: Universal Crop Harvester**.
 * Click the **Config** button.
-* An authentic, clean vanilla Minecraft style menu opens with interactive sliders and toggle switches. Frequently modified gameplay settings (Sapling Spacing, Flower Sparsity, Max Blocks, Farming Radius, In-World Preview) appear prominently at the top.
+* An authentic, clean vanilla Minecraft style menu opens with interactive sliders and toggle switches.
+* Frequently adjusted gameplay settings appear prominently at the top:
+  - **Sapling Minimum Spacing** (Slider: 0-8)
+  - **Flower & Flora Sparsity** (Slider: 0-5)
+  - **Maximum Blocks Affected** (Slider: 1-1024, default: 128)
+  - **Farming Radius** (Slider: 1-32, default: 8)
+  - **Water Irrigation Hole Spacing** (Slider: 8-16, default: 8)
+  - **Water Bucket Irrigation** (Toggle, default: ON)
+  - **Harvest Direct to Inventory** (Toggle, default: OFF)
+  - **Clear Replaceable Foliage when Hoeing** (Toggle, default: ON)
+  - **Prevent Tool Breaking** (Toggle, default: ON)
 * Features **Reset Defaults**, **Cancel**, and **Done** buttons with instant persistence.
 
 ### 📄 Configuration File
@@ -153,23 +204,35 @@ The configuration is saved automatically at `.minecraft/config/vein_farming-comm
   sapling_min_spacing = 4
   # Flora & Flower sparsity level (0 = OFF / Dense carpet, 1-5 = Organic meadow noise, default: 3)
   flower_sparsity = 3
-  # Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action
-  max_blocks = 64
-  # Maximum horizontal radius from the clicked block
+  # Maximum number of blocks to hoe, plant, fertilize, or harvest in a single action (1-1024, default: 128)
+  max_blocks = 128
+  # Maximum horizontal radius from the clicked block (1-32, default: 8)
   farming_radius = 8
+  # Minimum spacing between automated water irrigation holes in blocks (8-16, default: 8)
+  water_hole_spacing = 8
+  # Automatically dig and place water holes when holding a Hoe in main hand and Water Bucket in off hand
+  smart_water_bucket_irrigation = true
   # Send harvested items directly into the player's inventory instead of dropping them
   harvest_to_inventory = false
+  # Automatically collect and merge drops at clicked position during harvesting/destroying
+  collect_drops_at_target = true
   # Render real-time in-world preview highlight when mass farming key is held
   standalone_preview = true
+  # Render transparent ghost farmland previews when holding a Hoe
+  ghost_farmland_preview = true
+  # Render transparent ghost crop previews when holding seeds
+  ghost_plant_preview = true
+  # Render water hole placement wireframe previews when holding Hoe and Water Bucket
+  smart_irrigation_preview = true
   # 40/40 Inverted Checkerboard fruit stem planting (Melon & Pumpkin)
   smart_melon_pumpkin_planting = true
   # Allow bone meal on small flowers (Poppy, Dandelion, etc.) to propagate nearby clones (Bedrock Edition feature)
   bedrock_flower_bonemeal = true
-  # Alternating row intercropping when holding different seeds in both hands
+  # Alternating parallel row intercropping when holding different seeds in both hands
   smart_intercropping = true
   # Automatically replant harvested crops at age 0 using dropped or inventory seeds
   replant_crops = true
-  # Prevent tools from breaking
+  # Prevent tools from breaking by stopping at 1 durability
   prevent_tool_breaking = true
   # Clear wild grass/flowers above dirt when tilling
   clear_foliage = true
@@ -197,7 +260,7 @@ cd vein-farming
 ./gradlew build --no-daemon
 ```
 
-The compiled mod JAR will be located in `build/libs/`.
+The compiled mod JAR will be located in `build/libs/vein_farming-1.21.1-neoforge-2.0.0.jar`.
 
 ---
 
