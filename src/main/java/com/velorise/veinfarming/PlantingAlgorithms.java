@@ -233,7 +233,7 @@ public class PlantingAlgorithms {
                 }
             }
             add1x1SaplingsWithSpacing(level, remainingSoils, originSoilPos, minSpacing, finalSeed, chosenSaplingPositions, result, nearCache);
-            if (result.size() < 2) {
+            if (result.isEmpty()) {
                 return Collections.emptyList();
             }
             return result;
@@ -241,7 +241,7 @@ public class PlantingAlgorithms {
 
         // Standard 1x1 saplings (Oak, Birch, Acacia, Cherry, Mangrove, etc.)
         add1x1SaplingsWithSpacing(level, candidateSoilList, originSoilPos, minSpacing, seed, chosenSaplingPositions, result, nearCache);
-        if (result.size() < 2) {
+        if (result.isEmpty()) {
             return Collections.emptyList();
         }
         return result;

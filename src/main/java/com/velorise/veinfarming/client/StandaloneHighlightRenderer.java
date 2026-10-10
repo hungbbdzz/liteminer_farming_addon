@@ -26,11 +26,15 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.RenderHighlightEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -69,14 +73,96 @@ public class StandaloneHighlightRenderer {
         cachedPlannedWaterHoles = Collections.emptyList();
     }
 
+    @SubscribeEvent(priority = EventPriority.HIGH)
+    public void onRenderHighlight(RenderHighlightEvent.Block event) {
+        if (!FarmingConfig.STANDALONE_PREVIEW.get()) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        Player player = mc.player;
+        Level level = mc.level;
+        if (player == null || level == null) {
+            return;
+        }
+        if (!isClientVeinActive(player)) {
+            return;
+        }
+        HitResult hit = mc.hitResult;
+        if (!(hit instanceof BlockHitResult blockHit) || hit.getType() != HitResult.Type.BLOCK) {
+            return;
+        }
+        BlockPos clickedPos = blockHit.getBlockPos();
+        BlockState clickedState = level.getBlockState(clickedPos);
+        ItemStack heldItem = player.getMainHandItem();
+        ItemStack offItem = player.getOffhandItem();
+        if (isFarmingAction(level, player, clickedPos, clickedState, heldItem, offItem)) {
+            // Cancel vanilla block highlight AND suppress LiteMiner/FTB Ultimine's basic wireframes
+            // so Vein Farming's rich preview and ghost models can render cleanly without visual collision!
+            event.setCanceled(true);
+        }
+    }
+
+    public static boolean isClientVeinActive(Player player) {
+        if (player == null) return false;
+        if (LiteMinerCompat.isLiteMinerLoaded() && LiteMinerCompat.isLiteMinerClientActive()) {
+            return true;
+        }
+        if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineClientActive()) {
+            return true;
+        }
+        return ModKeyMappings.isKeyActive();
+    }
+
+    public static boolean isFarmingAction(Level level, Player player, BlockPos clickedPos, BlockState clickedState, ItemStack heldItem, ItemStack offItem) {
+        if (level == null || player == null || clickedPos == null) {
+            return false;
+        }
+
+        // 1. Planting (Seeds, saplings, cocoa, flora, mushrooms, chorus flower)
+        if (PlantClassifier.isPlantableSeed(heldItem) || PlantClassifier.isCocoaBean(heldItem)) {
+            return true;
+        }
+
+        // 2. Hoeing
+        if (FarmingEventHandler.isHoe(heldItem)) {
+            return true;
+        }
+
+        // 3. Bone meal
+        if (heldItem.is(Items.BONE_MEAL)) {
+            return true;
+        }
+
+        // 4. Batch Composter
+        if (clickedState.is(Blocks.COMPOSTER) && FarmingManager.isCompostable(heldItem)) {
+            return true;
+        }
+
+        // 5. Crops & Agricultural Plants
+        BlockPos targetCrop = clickedPos;
+        if (FarmingManager.isRiceCrop(clickedState)) {
+            if (FarmingManager.isRiceCrop(level.getBlockState(clickedPos.above()))) {
+                targetCrop = clickedPos.above();
+            }
+        } else if (!FarmingManager.isCrop(clickedState) && !FarmingManager.isColumnCrop(clickedState) && !FarmingManager.isFruitCrop(clickedState) && !FarmingManager.isHarvestablePlant(clickedState)) {
+            targetCrop = clickedPos.above();
+        }
+        BlockState targetCropState = level.getBlockState(targetCrop);
+
+        if (FarmingManager.isHarvestablePlant(targetCropState)
+                || FarmingManager.isHarvestablePlant(clickedState)
+                || FarmingManager.isRiceCrop(targetCropState)
+                || FarmingManager.isRiceCrop(clickedState)
+                || FarmingManager.isFarmland(clickedState)) {
+            return true;
+        }
+
+        return false;
+    }
+
     @SubscribeEvent
     public void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
-            return;
-        }
-
-        // If LiteMiner or FTB Ultimine is loaded, let them handle their own highlight rendering!
-        if (LiteMinerCompat.isLiteMinerLoaded() || FTBUltimineCompat.isFTBUltimineLoaded()) {
             return;
         }
 
@@ -98,19 +184,6 @@ public class StandaloneHighlightRenderer {
             lastSmartPlantEnabled = currentSmartPlant;
         }
 
-        // Check activation condition: FTB Ultimine keybind, or dedicated key / Shift fallback in standalone mode
-        boolean active = false;
-        if (FTBUltimineCompat.isFTBUltimineLoaded()) {
-            active = FTBUltimineCompat.isUltimineClientActive();
-        } else {
-            active = ModKeyMappings.isKeyActive();
-        }
-
-        if (!active) {
-            clearCache();
-            return;
-        }
-
         HitResult hit = mc.hitResult;
         if (!(hit instanceof BlockHitResult blockHit) || hit.getType() != HitResult.Type.BLOCK) {
             clearCache();
@@ -122,6 +195,23 @@ public class StandaloneHighlightRenderer {
         ItemStack heldItem = player.getMainHandItem();
         ItemStack offItem = player.getOffhandItem();
         InteractionHand hand = InteractionHand.MAIN_HAND;
+
+        boolean isCompanionLoaded = LiteMinerCompat.isLiteMinerLoaded() || FTBUltimineCompat.isFTBUltimineLoaded();
+        boolean farmingAction = isFarmingAction(level, player, clickedPos, clickedState, heldItem, offItem);
+
+        // When a companion mod is loaded, we ONLY override agricultural actions (planting, saplings, crops, tilling, harvest).
+        // Non-farming actions (mining stone, cutting trees with axe) are left to LiteMiner / FTB Ultimine.
+        if (isCompanionLoaded && !farmingAction) {
+            clearCache();
+            return;
+        }
+
+        // Check activation condition: LiteMiner key, FTB Ultimine key, or dedicated key / Shift fallback in standalone mode
+        boolean active = isClientVeinActive(player);
+        if (!active) {
+            clearCache();
+            return;
+        }
 
         // Check if cached search result is still valid (throttle search to at most once per 250ms when looking at same block)
         long now = System.currentTimeMillis();
@@ -186,17 +276,61 @@ public class StandaloneHighlightRenderer {
 
             if (isPlant && (isAttacking || isTool || !isHarvestable)) {
                 // DESTROY PREVIEW (Left-click / Breaking Mode) - Vivid Crimson Red
-                previewBlocks = FarmingManager.findDestroyTargets(level, targetCrop, targetCropState);
+                Collection<BlockPos> companionBlocks = Collections.emptyList();
+                if (isCompanionLoaded) {
+                    companionBlocks = FarmingManager.getClientSelectedPositions(level, player, targetCrop);
+                }
+                if (companionBlocks != null && !companionBlocks.isEmpty()) {
+                    List<BlockPos> targets = new ArrayList<>();
+                    for (BlockPos p : companionBlocks) {
+                        if (FarmingManager.isHarvestablePlant(level.getBlockState(p))) {
+                            targets.add(p);
+                        }
+                    }
+                    previewBlocks = targets;
+                } else {
+                    previewBlocks = FarmingManager.findDestroyTargets(level, targetCrop, targetCropState);
+                }
                 r = 1.0f; g = 0.22f; b = 0.22f; a = 0.85f;
             } else if (isHarvestable) {
                 // HARVEST PREVIEW (Right-click Harvest Mode) - Golden Autumn Harvest
-                previewBlocks = FarmingManager.fallbackHarvestSearch(level, targetCrop);
+                Collection<BlockPos> companionBlocks = Collections.emptyList();
+                if (isCompanionLoaded) {
+                    companionBlocks = FarmingManager.getClientSelectedPositions(level, player, targetCrop);
+                }
+                if (companionBlocks != null && !companionBlocks.isEmpty()) {
+                    List<BlockPos> targets = new ArrayList<>();
+                    for (BlockPos p : companionBlocks) {
+                        BlockState s = level.getBlockState(p);
+                        if (FarmingManager.isMatureCrop(s) || FarmingManager.isFruitCrop(s) || FarmingManager.isColumnCrop(s) || FarmingManager.isChorus(s)) {
+                            targets.add(p);
+                        }
+                    }
+                    previewBlocks = targets;
+                } else {
+                    previewBlocks = FarmingManager.fallbackHarvestSearch(level, targetCrop);
+                }
                 r = 1.0f; g = 0.82f; b = 0.2f; a = 0.8f;
             } else if (clickedState.is(Blocks.COMPOSTER) && FarmingConfig.BATCH_COMPOSTER.get() && FarmingManager.isCompostable(heldItem)) {
                 previewBlocks = Collections.singletonList(clickedPos);
                 r = 0.45f; g = 0.75f; b = 0.25f; // Compost Green
             } else if (FarmingEventHandler.isHoe(heldItem) && FarmingManager.isTillable(level, player, hand, clickedPos)) {
-                previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
+                Collection<BlockPos> companionBlocks = Collections.emptyList();
+                if (isCompanionLoaded) {
+                    companionBlocks = FarmingManager.getClientSelectedPositions(level, player, clickedPos);
+                }
+                if (companionBlocks != null && !companionBlocks.isEmpty()) {
+                    List<BlockPos> tillable = new ArrayList<>();
+                    for (BlockPos p : companionBlocks) {
+                        if (FarmingManager.isTillable(level, player, hand, p)) {
+                            tillable.add(p);
+                        }
+                    }
+                    tillable.sort(Comparator.comparingInt(p -> p.distManhattan(clickedPos)));
+                    previewBlocks = tillable;
+                } else {
+                    previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
+                }
                 r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
                 isHoe = true;
                 if (PlantClassifier.isWaterContainer(offItem) && FarmingConfig.SMART_WATER_BUCKET_IRRIGATION.get() && previewBlocks.size() >= 2) {
@@ -209,7 +343,19 @@ public class StandaloneHighlightRenderer {
                         : ((FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) && (level.getBlockState(clickedPos.above()).isAir() || level.getBlockState(clickedPos.above()).canBeReplaced()))
                            || (FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below()) && (clickedState.isAir() || clickedState.canBeReplaced())))
             )) {
-                previewBlocks = FarmingManager.fallbackPlantingSearch(level, clickedPos, heldItem, ModKeyMappings.isSmartPlantEnabled());
+                BlockPos startSoilPos = FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos) ? clickedPos : clickedPos.below();
+                Collection<BlockPos> companionBlocks = Collections.emptyList();
+                if (isCompanionLoaded) {
+                    companionBlocks = FarmingManager.getClientSelectedPositions(level, player, startSoilPos);
+                    if (companionBlocks == null || companionBlocks.isEmpty()) {
+                        companionBlocks = FarmingManager.getClientSelectedPositions(level, player, clickedPos);
+                    }
+                }
+                if (companionBlocks != null && !companionBlocks.isEmpty()) {
+                    previewBlocks = PlantingManager.filterSelectedPlantingPositions(level, companionBlocks, startSoilPos, heldItem, ModKeyMappings.isSmartPlantEnabled());
+                } else {
+                    previewBlocks = PlantingManager.fallbackPlantingSearch(level, clickedPos, heldItem, ModKeyMappings.isSmartPlantEnabled());
+                }
                 r = 0.4f; g = 0.85f; b = 0.3f; // Sprout Green
                 isPlanting = true;
                 if (FarmingConfig.GHOST_PLANT_PREVIEW.get()) {
@@ -227,7 +373,26 @@ public class StandaloneHighlightRenderer {
                         || FarmingManager.isBonemealCrop(clickedState)
                         || FarmingManager.isBonemealCrop(level.getBlockState(clickedPos.above()))
                         || FarmingManager.isSmallFlower(clickedState)) {
-                    previewBlocks = FarmingManager.fallbackCropSearch(level, clickedPos);
+                    BlockPos targetPos = FarmingManager.isFarmland(clickedState) ? clickedPos.above() : clickedPos;
+                    Collection<BlockPos> companionBlocks = Collections.emptyList();
+                    if (isCompanionLoaded) {
+                        companionBlocks = FarmingManager.getClientSelectedPositions(level, player, targetPos);
+                        if (companionBlocks == null || companionBlocks.isEmpty()) {
+                            companionBlocks = FarmingManager.getClientSelectedPositions(level, player, targetPos.below());
+                        }
+                    }
+                    if (companionBlocks != null && !companionBlocks.isEmpty()) {
+                        List<BlockPos> bonemealable = new ArrayList<>();
+                        for (BlockPos p : companionBlocks) {
+                            BlockState s = level.getBlockState(p);
+                            if (FarmingManager.isCrop(s) || FarmingManager.isBonemealCrop(s) || FarmingManager.isSmallFlower(s)) {
+                                bonemealable.add(p);
+                            }
+                        }
+                        previewBlocks = bonemealable;
+                    } else {
+                        previewBlocks = FarmingManager.fallbackCropSearch(level, clickedPos);
+                    }
                     if (FarmingManager.isSmallFlower(clickedState)) {
                         r = 0.95f; g = 0.55f; b = 0.85f; // Flora Blossom Pink
                     } else {

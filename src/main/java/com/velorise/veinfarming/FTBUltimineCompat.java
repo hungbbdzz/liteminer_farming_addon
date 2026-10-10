@@ -59,6 +59,39 @@ public class FTBUltimineCompat {
         return false;
     }
 
+    public static java.util.Collection<net.minecraft.core.BlockPos> getClientSelectedBlocks(Player player, net.minecraft.core.BlockPos targetPos) {
+        if (!isFTBUltimineLoaded() || player == null || targetPos == null) {
+            return java.util.Collections.emptyList();
+        }
+        try {
+            Class<?> ftbClass = Class.forName("dev.ftb.mods.ftbultimine.FTBUltimine");
+            Method getInstanceMethod = ftbClass.getMethod("getInstance");
+            Object instance = getInstanceMethod.invoke(null);
+            if (instance != null) {
+                Method getPlayerDataMethod = ftbClass.getMethod("getOrCreatePlayerData", Player.class);
+                Object data = getPlayerDataMethod.invoke(instance, player);
+                if (data != null) {
+                    Method hasCachedMethod = data.getClass().getMethod("hasCachedPositions");
+                    Method cachedPositionsMethod = data.getClass().getMethod("cachedPositions");
+                    if ((boolean) hasCachedMethod.invoke(data)) {
+                        Object coll = cachedPositionsMethod.invoke(data);
+                        if (coll instanceof java.util.Collection<?> collection && !collection.isEmpty()) {
+                            java.util.List<net.minecraft.core.BlockPos> list = new java.util.ArrayList<>();
+                            for (Object obj : collection) {
+                                if (obj instanceof net.minecraft.core.BlockPos bp) {
+                                    list.add(bp);
+                                }
+                            }
+                            return list;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return java.util.Collections.emptyList();
+    }
+
     /**
      * Gets the target blocks strictly determined by FTB Ultimine's active shape and preview.
      */

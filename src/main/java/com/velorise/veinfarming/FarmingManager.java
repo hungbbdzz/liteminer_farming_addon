@@ -65,6 +65,22 @@ public class FarmingManager {
         return Collections.emptyList();
     }
 
+    public static Collection<BlockPos> getClientSelectedPositions(Level level, net.minecraft.world.entity.player.Player player, BlockPos pos) {
+        if (LiteMinerCompat.isLiteMinerLoaded() && LiteMinerCompat.isLiteMinerClientActive()) {
+            Collection<BlockPos> lm = LiteMinerCompat.getClientSelectedBlocks(level, player, pos);
+            if (lm != null && !lm.isEmpty()) {
+                return lm;
+            }
+        }
+        if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineClientActive()) {
+            Collection<BlockPos> ftb = FTBUltimineCompat.getClientSelectedBlocks(player, pos);
+            if (ftb != null && !ftb.isEmpty()) {
+                return ftb;
+            }
+        }
+        return Collections.emptyList();
+    }
+
     public static int getEffectiveBlockLimit(ServerPlayer player) {
         if (LiteMinerCompat.isLiteMinerLoaded() && LiteMinerCompat.isLiteMinerActive(player)) {
             return LiteMinerCompat.getEffectiveBlockLimit();
@@ -280,6 +296,9 @@ public class FarmingManager {
     }
     public static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startFarmPos) {
         return PlantingManager.fallbackPlantingSearch(level, startFarmPos);
+    }
+    public static Collection<BlockPos> filterSelectedPlantingPositions(Level level, Collection<BlockPos> candidateBlocks, BlockPos clickedSoilPos, ItemStack seedStack, boolean applySmartPlant) {
+        return PlantingManager.filterSelectedPlantingPositions(level, candidateBlocks, clickedSoilPos, seedStack, applySmartPlant);
     }
 
     // ==========================================

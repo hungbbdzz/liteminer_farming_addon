@@ -63,45 +63,47 @@ public class PlantingManager {
             }
         }
 
-        Collection<BlockPos> selected = FarmingManager.getSelectedPositions(player, startSoilPos);
-        if (selected == null || selected.isEmpty()) {
-            selected = fallbackPlantingSearch(level, startSoilPos, seedStack, false);
-        }
-
-        if (selected == null || selected.isEmpty()) {
-            return false;
-        }
-
-        final BlockPos originSoilPos = startSoilPos;
-        List<BlockPos> sorted = selected.stream()
-                .sorted(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)))
-                .toList();
-
         boolean isSmartPlant = FarmingEventHandler.isPlayerSmartPlantEnabled(player.getUUID());
 
-        if (isSmartPlant) {
-            if (PlantClassifier.isCactus(seedStack)) {
-                sorted = PlantingAlgorithms.filterOptimalCactusPositions(level, sorted, originSoilPos);
-                if (sorted == null || sorted.isEmpty()) {
-                    return false;
+        Collection<BlockPos> selected = FarmingManager.getSelectedPositions(player, startSoilPos);
+        if (selected == null || selected.isEmpty()) {
+            selected = FarmingManager.getSelectedPositions(player, clickedPos);
+        }
+
+        List<BlockPos> sorted;
+        if (selected != null && !selected.isEmpty()) {
+            Collection<BlockPos> filtered = filterSelectedPlantingPositions(level, selected, startSoilPos, seedStack, isSmartPlant);
+            if (filtered == null || filtered.isEmpty()) {
+                return false;
+            }
+            sorted = new ArrayList<>(filtered);
+        } else {
+            selected = fallbackPlantingSearch(level, startSoilPos, seedStack, false);
+            if (selected == null || selected.isEmpty()) {
+                return false;
+            }
+            final BlockPos originSoilPos = startSoilPos;
+            sorted = selected.stream()
+                    .sorted(Comparator.comparingInt(p -> p.distManhattan(originSoilPos)))
+                    .toList();
+
+            if (isSmartPlant) {
+                if (PlantClassifier.isCactus(seedStack)) {
+                    sorted = PlantingAlgorithms.filterOptimalCactusPositions(level, sorted, originSoilPos);
+                } else if (PlantClassifier.isFruitSeed(seedStack) && FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.get()) {
+                    sorted = PlantingAlgorithms.filterOptimalFruitStemPositions(level, sorted, originSoilPos);
+                } else if (PlantClassifier.isSapling(seedStack) && FarmingConfig.isSmartSaplingEnabled()) {
+                    sorted = PlantingAlgorithms.filterSmartSaplingPositions(level, sorted, seedStack, originSoilPos);
+                } else if ((PlantClassifier.isFlower(seedStack) || PlantClassifier.isMushroom(seedStack) || PlantClassifier.isChorusFlower(seedStack)) && FarmingConfig.isSmartFlowerEnabled()) {
+                    sorted = PlantingAlgorithms.filterAntiOvercrowdedFloraPositions(level, sorted, originSoilPos, seedStack);
                 }
-            } else if (PlantClassifier.isFruitSeed(seedStack) && FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.get()) {
-                sorted = PlantingAlgorithms.filterOptimalFruitStemPositions(level, sorted, originSoilPos);
-                if (sorted == null || sorted.isEmpty()) {
-                    return false;
-                }
-            } else if (PlantClassifier.isSapling(seedStack) && FarmingConfig.isSmartSaplingEnabled()) {
-                sorted = PlantingAlgorithms.filterSmartSaplingPositions(level, sorted, seedStack, originSoilPos);
-                if (sorted == null || sorted.isEmpty()) {
-                    return false;
-                }
-            } else if ((PlantClassifier.isFlower(seedStack) || PlantClassifier.isMushroom(seedStack) || PlantClassifier.isChorusFlower(seedStack)) && FarmingConfig.isSmartFlowerEnabled()) {
-                sorted = PlantingAlgorithms.filterAntiOvercrowdedFloraPositions(level, sorted, originSoilPos, seedStack);
                 if (sorted == null || sorted.isEmpty()) {
                     return false;
                 }
             }
         }
+
+        final BlockPos originSoilPos = startSoilPos;
 
         int maxLimit = FarmingManager.getEffectiveBlockLimit(player);
         float exhaustion = FarmingManager.getFoodExhaustion(player);
@@ -497,6 +499,112 @@ public class PlantingManager {
 
     public static Collection<BlockPos> fallbackPlantingSearch(Level level, BlockPos startFarmPos) {
         return fallbackPlantingSearch(level, startFarmPos, ItemStack.EMPTY, true);
+    }
+
+    public static Collection<BlockPos> filterSelectedPlantingPositions(
+            Level level,
+            Collection<BlockPos> candidateBlocks,
+            BlockPos clickedSoilPos,
+            ItemStack seedStack,
+            boolean applySmartPlant
+    ) {
+        if (candidateBlocks == null || candidateBlocks.isEmpty() || level == null || seedStack.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        if (PlantClassifier.isCocoaBean(seedStack)) {
+            return filterSelectedCocoaPositions(level, candidateBlocks, clickedSoilPos);
+        }
+
+        // 1. Identify valid soil positions within candidateBlocks
+        // Companion mods may select either the soil block itself OR the space/plant block above it.
+        Set<BlockPos> validSoils = new LinkedHashSet<>();
+        for (BlockPos pos : candidateBlocks) {
+            BlockState state = level.getBlockState(pos);
+            // Case A: pos is the soil itself
+            if (PlantClassifier.isValidSoilForSeed(seedStack, state, level, pos)) {
+                BlockPos above = pos.above();
+                BlockState aboveState = level.getBlockState(above);
+                if (aboveState.isAir() || aboveState.canBeReplaced()) {
+                    validSoils.add(pos);
+                }
+            }
+            // Case B: pos is the air/plant space above soil
+            else if (state.isAir() || state.canBeReplaced()) {
+                BlockPos below = pos.below();
+                BlockState belowState = level.getBlockState(below);
+                if (PlantClassifier.isValidSoilForSeed(seedStack, belowState, level, below)) {
+                    validSoils.add(below);
+                }
+            }
+        }
+
+        if (validSoils.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. Sort by distance from origin clicked soil
+        List<BlockPos> sorted = new ArrayList<>(validSoils);
+        if (clickedSoilPos != null) {
+            sorted.sort(Comparator.comparingInt(p -> p.distManhattan(clickedSoilPos)));
+        }
+
+        // 3. Apply companion block limit if lower than candidate count
+        int maxLimit = LiteMinerCompat.isLiteMinerLoaded()
+                ? LiteMinerCompat.getEffectiveBlockLimit()
+                : FarmingConfig.MAX_BLOCKS.get();
+        if (sorted.size() > maxLimit) {
+            sorted = new ArrayList<>(sorted.subList(0, maxLimit));
+        }
+
+        // 4. Apply smart planting algorithms if enabled
+        if (applySmartPlant) {
+            if (PlantClassifier.isCactus(seedStack)) {
+                sorted = PlantingAlgorithms.filterOptimalCactusPositions(level, sorted, clickedSoilPos);
+            } else if (PlantClassifier.isFruitSeed(seedStack) && FarmingConfig.SMART_MELON_PUMPKIN_PLANTING.get()) {
+                sorted = PlantingAlgorithms.filterOptimalFruitStemPositions(level, sorted, clickedSoilPos);
+            } else if (PlantClassifier.isSapling(seedStack) && FarmingConfig.isSmartSaplingEnabled()) {
+                sorted = PlantingAlgorithms.filterSmartSaplingPositions(level, sorted, seedStack, clickedSoilPos);
+            } else if ((PlantClassifier.isFlower(seedStack) || PlantClassifier.isMushroom(seedStack) || PlantClassifier.isChorusFlower(seedStack)) && FarmingConfig.isSmartFlowerEnabled()) {
+                sorted = PlantingAlgorithms.filterAntiOvercrowdedFloraPositions(level, sorted, clickedSoilPos, seedStack);
+            }
+        }
+
+        return sorted != null ? sorted : Collections.emptyList();
+    }
+
+    public static Collection<BlockPos> filterSelectedCocoaPositions(Level level, Collection<BlockPos> candidateBlocks, BlockPos clickedPos) {
+        List<BlockPos> targetPodPositions = new ArrayList<>();
+        for (BlockPos pos : candidateBlocks) {
+            BlockState s = level.getBlockState(pos);
+            if (PlantClassifier.isJungleLog(s)) {
+                for (Direction dir : Direction.Plane.HORIZONTAL) {
+                    BlockPos podPos = pos.relative(dir);
+                    BlockState podState = level.getBlockState(podPos);
+                    if (podState.isAir() || podState.canBeReplaced()) {
+                        Direction facingToLog = dir.getOpposite();
+                        BlockState placeState = Blocks.COCOA.defaultBlockState().setValue(CocoaBlock.FACING, facingToLog);
+                        if (placeState.canSurvive(level, podPos) && !targetPodPositions.contains(podPos)) {
+                            targetPodPositions.add(podPos);
+                        }
+                    }
+                }
+            } else if (s.getBlock() instanceof CocoaBlock) {
+                if (!targetPodPositions.contains(pos)) {
+                    targetPodPositions.add(pos);
+                }
+            }
+        }
+        if (clickedPos != null) {
+            targetPodPositions.sort(Comparator.comparingInt(p -> p.distManhattan(clickedPos)));
+        }
+        int maxLimit = LiteMinerCompat.isLiteMinerLoaded()
+                ? LiteMinerCompat.getEffectiveBlockLimit()
+                : FarmingConfig.MAX_BLOCKS.get();
+        if (targetPodPositions.size() > maxLimit) {
+            return targetPodPositions.subList(0, maxLimit);
+        }
+        return targetPodPositions;
     }
 }
 

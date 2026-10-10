@@ -27,6 +27,63 @@ public class LiteMinerCompat {
         }
     }
 
+    public static boolean isLiteMinerClientActive() {
+        if (!isLiteMinerLoaded()) {
+            return false;
+        }
+        try {
+            return ClientHandler.isClientActive();
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    public static Collection<BlockPos> getClientSelectedBlocks(net.minecraft.world.level.Level level, net.minecraft.world.entity.player.Player player, BlockPos targetPos) {
+        if (!isLiteMinerLoaded()) {
+            return Collections.emptyList();
+        }
+        try {
+            return ClientHandler.getClientSelectedBlocks(level, player, targetPos);
+        } catch (Throwable t) {
+            return Collections.emptyList();
+        }
+    }
+
+    private static class ClientHandler {
+        private static boolean isClientActive() {
+            try {
+                return com.iamkaf.liteminer.LiteminerClient.isVeinMining()
+                        || (com.iamkaf.liteminer.LiteminerClient.KEY_MAPPING != null
+                            && com.iamkaf.liteminer.LiteminerClient.KEY_MAPPING.isDown());
+            } catch (Throwable t) {
+                return false;
+            }
+        }
+
+        private static Collection<BlockPos> getClientSelectedBlocks(net.minecraft.world.level.Level level, net.minecraft.world.entity.player.Player player, BlockPos targetPos) {
+            try {
+                var set = com.iamkaf.liteminer.LiteminerClient.selectedBlocks;
+                if (set != null && !set.isEmpty() && targetPos != null && (set.contains(targetPos) || set.contains(targetPos.above()) || set.contains(targetPos.below()))) {
+                    return new java.util.ArrayList<>(set);
+                }
+                if (com.iamkaf.liteminer.LiteminerClient.shapes != null) {
+                    var walker = com.iamkaf.liteminer.LiteminerClient.shapes.getCurrentItem();
+                    if (walker != null && level != null && player != null && targetPos != null) {
+                        var walked = walker.walk(level, player, targetPos);
+                        if (walked != null && !walked.isEmpty()) {
+                            return walked;
+                        }
+                    }
+                }
+                if (set != null && !set.isEmpty()) {
+                    return new java.util.ArrayList<>(set);
+                }
+            } catch (Throwable ignored) {
+            }
+            return Collections.emptyList();
+        }
+    }
+
     /**
      * Gets the target blocks strictly determined by LiteMiner's active Walker/Shape.
      */
