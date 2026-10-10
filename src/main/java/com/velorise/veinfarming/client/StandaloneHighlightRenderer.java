@@ -120,7 +120,14 @@ public class StandaloneHighlightRenderer {
 
         // 1. Planting (Seeds, saplings, cocoa, flora, mushrooms, chorus flower)
         if (PlantClassifier.isPlantableSeed(heldItem) || PlantClassifier.isCocoaBean(heldItem)) {
-            return true;
+            if (PlantClassifier.isCocoaBean(heldItem)) {
+                if (PlantClassifier.isJungleLog(clickedState) || clickedState.getBlock() instanceof CocoaBlock) {
+                    return true;
+                }
+            } else if (FarmingManager.isValidSoilForSeed(heldItem, clickedState, level, clickedPos)
+                    || FarmingManager.isValidSoilForSeed(heldItem, level.getBlockState(clickedPos.below()), level, clickedPos.below())) {
+                return true;
+            }
         }
 
         // 2. Hoeing
@@ -152,8 +159,7 @@ public class StandaloneHighlightRenderer {
         if (FarmingManager.isHarvestablePlant(targetCropState)
                 || FarmingManager.isHarvestablePlant(clickedState)
                 || FarmingManager.isRiceCrop(targetCropState)
-                || FarmingManager.isRiceCrop(clickedState)
-                || FarmingManager.isFarmland(clickedState)) {
+                || FarmingManager.isRiceCrop(clickedState)) {
             return true;
         }
 

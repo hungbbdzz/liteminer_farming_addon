@@ -462,6 +462,7 @@ public class PlantingManager {
                             if (nextState.is(startState.getBlock())
                                     || (startState.is(BlockTags.DIRT) && nextState.is(BlockTags.DIRT))
                                     || (startState.is(BlockTags.SAND) && nextState.is(BlockTags.SAND))
+                                    || (PlantClassifier.isSugarCane(seedStack) && (nextState.is(BlockTags.DIRT) || nextState.is(BlockTags.SAND) || PlantClassifier.isSugarCane(nextState)))
                                     || (seedStack.is(Items.BAMBOO) && nextState.is(BlockTags.BAMBOO_PLANTABLE_ON))
                                     || (PlantClassifier.isChorusFlower(seedStack) && nextState.is(Blocks.END_STONE))
                                     || (PlantClassifier.isMushroom(seedStack) && (nextState.is(BlockTags.DIRT) || nextState.is(BlockTags.NYLIUM) || nextState.is(Blocks.MYCELIUM) || nextState.is(Blocks.PODZOL)))) {

@@ -482,36 +482,112 @@ public class PlantClassifier {
     }
 
     /**
-     * Universal soil check for any seed.
+     * Universal soil check for any seed/plantable item.
      */
     public static boolean isValidSoilForSeed(ItemStack seedStack, BlockState soilState, Level level, BlockPos soilPos) {
         if (seedStack == null || seedStack.isEmpty() || soilState == null) {
             return false;
         }
+
+        // 1. Cocoa Beans (strictly jungle logs or cocoa blocks, never farmland)
         if (isCocoaBean(seedStack)) {
             return isJungleLog(soilState) || soilState.getBlock() instanceof CocoaBlock;
         }
+
+        // 2. Chorus Flower (strictly end stone, never farmland)
         if (isChorusFlower(seedStack)) {
             return soilState.is(Blocks.END_STONE);
         }
+
+        // 3. Cactus (strictly sand, never farmland)
         if (isCactus(seedStack)) {
+            if (isFarmland(soilState)) {
+                return false;
+            }
             return soilState.is(BlockTags.SAND) || soilState.is(Blocks.SAND) || soilState.is(Blocks.RED_SAND);
         }
+
+        // 4. Nether Wart (strictly soul sand, never farmland)
         if (seedStack.is(Items.NETHER_WART)) {
+            if (isFarmland(soilState)) {
+                return false;
+            }
             return isSoulSand(soilState);
         }
-        if (seedStack.is(Items.BAMBOO)) {
+
+        // 5. Bamboo (strictly bamboo plantable soil, never farmland)
+        if (isBamboo(seedStack)) {
+            if (isFarmland(soilState)) {
+                return false;
+            }
             return soilState.is(BlockTags.BAMBOO_PLANTABLE_ON) || soilState.is(BlockTags.DIRT) || soilState.is(BlockTags.SAND);
         }
-        if (isFarmland(soilState)) {
-            return true;
+
+        // 6. Sugar Cane (strictly dirt/sand/mud with adjacent water, or existing sugar cane; NEVER farmland!)
+        if (isSugarCane(seedStack)) {
+            if (isFarmland(soilState)) {
+                return false;
+            }
+            if (isSugarCane(soilState)) {
+                return true; // vertical stacking on existing sugar cane
+            }
+            if (level != null && soilPos != null) {
+                BlockPos plantPos = soilPos.above();
+                return Blocks.SUGAR_CANE.defaultBlockState().canSurvive(level, plantPos);
+            }
+            return soilState.is(BlockTags.DIRT) || soilState.is(BlockTags.SAND);
         }
+
+        // 7. Tree Saplings (strictly dirt/moss/mud/etc., never farmland in Vein Farming!)
+        if (isSapling(seedStack)) {
+            if (isFarmland(soilState)) {
+                return false;
+            }
+            if (level != null && soilPos != null) {
+                BlockPos plantPos = soilPos.above();
+                Item item = seedStack.getItem();
+                if (item instanceof BlockItem blockItem) {
+                    return blockItem.getBlock().defaultBlockState().canSurvive(level, plantPos);
+                }
+            }
+            return soilState.is(BlockTags.DIRT) || soilState.is(Blocks.MUD) || soilState.is(Blocks.MOSS_BLOCK);
+        }
+
+        // 8. Aquatic / Marine flora (strictly water, never farmland)
+        if (seedStack.is(Items.KELP) || seedStack.is(Items.SEA_PICKLE) || seedStack.is(Items.LILY_PAD) || seedStack.is(Items.SEAGRASS)) {
+            return false;
+        }
+
+        // 9. Farmland targets: ONLY crops and plants that actually belong on Farmland!
+        if (isFarmland(soilState)) {
+            if (isFarmlandCrop(seedStack) || isFruitSeed(seedStack) || isIntercroppableCrop(seedStack)) {
+                return true;
+            }
+            Item item = seedStack.getItem();
+            if (item instanceof BlockItem blockItem) {
+                Block block = blockItem.getBlock();
+                if (block instanceof CropBlock || block instanceof StemBlock || block instanceof AttachedStemBlock) {
+                    return true;
+                }
+                if (level != null && soilPos != null) {
+                    BlockPos plantPos = soilPos.above();
+                    return block.defaultBlockState().canSurvive(level, plantPos);
+                }
+            }
+            return false;
+        }
+
+        // 10. Generic fallback for any other placeable plant on non-farmland soils (e.g. flowers, mushrooms, sweet berries on dirt)
         Item item = seedStack.getItem();
         if (item instanceof BlockItem blockItem) {
             Block block = blockItem.getBlock();
-            BlockPos plantPos = soilPos.above();
-            return block.defaultBlockState().canSurvive(level, plantPos);
+            if (level != null && soilPos != null) {
+                BlockPos plantPos = soilPos.above();
+                return block.defaultBlockState().canSurvive(level, plantPos);
+            }
+            return soilState.is(BlockTags.DIRT);
         }
+
         return false;
     }
 
@@ -748,6 +824,17 @@ public class PlantClassifier {
         return false;
     }
 
+    public static boolean isFarmlandCrop(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (isIntercroppableCrop(stack) || isFruitSeed(stack)) {
+            return true;
+        }
+        Block cropBlock = getCropBlock(stack);
+        return cropBlock != null && isFarmlandCrop(cropBlock.defaultBlockState());
+    }
+
     /**
      * Checks if a block is an agricultural crop or harvestable plant.
      * Strictly excludes regular environmental blocks (Stone, Dirt, Wood, Ores, etc.).
@@ -793,7 +880,56 @@ public class PlantClassifier {
     }
 
     public static boolean isSugarCane(BlockState state) {
-        return isColumnCrop(state);
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        Block block = state.getBlock();
+        if (block instanceof SugarCaneBlock || state.is(Blocks.SUGAR_CANE)) {
+            return true;
+        }
+        String id = block.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("sugar_cane") || id.contains("sugarcane");
+    }
+
+    public static boolean isSugarCane(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (stack.is(Items.SUGAR_CANE)) {
+            return true;
+        }
+        if (stack.getItem() instanceof BlockItem bi) {
+            return isSugarCane(bi.getBlock().defaultBlockState());
+        }
+        String id = stack.getItem().getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("sugar_cane") || id.contains("sugarcane");
+    }
+
+    public static boolean isBamboo(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (stack.is(Items.BAMBOO)) {
+            return true;
+        }
+        if (stack.getItem() instanceof BlockItem bi) {
+            Block b = bi.getBlock();
+            return b instanceof BambooStalkBlock || b instanceof BambooSaplingBlock || b.defaultBlockState().is(Blocks.BAMBOO) || b.defaultBlockState().is(Blocks.BAMBOO_SAPLING);
+        }
+        String id = stack.getItem().getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("bamboo");
+    }
+
+    public static boolean isBamboo(BlockState state) {
+        if (state == null || state.isAir()) {
+            return false;
+        }
+        Block b = state.getBlock();
+        if (b instanceof BambooStalkBlock || b instanceof BambooSaplingBlock || state.is(Blocks.BAMBOO) || state.is(Blocks.BAMBOO_SAPLING)) {
+            return true;
+        }
+        String id = b.getDescriptionId().toLowerCase(Locale.ROOT);
+        return id.contains("bamboo");
     }
 
     public static boolean isSameColumnType(BlockState a, BlockState b) {

@@ -333,12 +333,12 @@ public class FarmingEventHandler {
             return true;
         }
         boolean isDirectCrop = FarmingManager.isCrop(clickedState) || FarmingManager.isColumnCrop(clickedState) || FarmingManager.isFruitCrop(clickedState) || FarmingManager.isChorus(clickedState);
-        boolean isSoil = FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState) || clickedState.is(Blocks.END_STONE);
         boolean isAboveCrop = FarmingManager.isCrop(level.getBlockState(clickedPos.above()))
                 || FarmingManager.isColumnCrop(level.getBlockState(clickedPos.above()))
                 || FarmingManager.isFruitCrop(level.getBlockState(clickedPos.above()))
                 || FarmingManager.isChorus(level.getBlockState(clickedPos.above()));
-        return isDirectCrop || isSoil || isAboveCrop;
+        boolean isSoilUnderCrop = (FarmingManager.isFarmland(clickedState) || FarmingManager.isSoulSand(clickedState) || clickedState.is(Blocks.END_STONE)) && isAboveCrop;
+        return isDirectCrop || isSoilUnderCrop;
     }
 
     private static final java.util.Map<java.util.UUID, Boolean> ACTIVE_KEYS = new java.util.concurrent.ConcurrentHashMap<>();
