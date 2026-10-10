@@ -799,5 +799,174 @@ public class PlantingAlgorithms {
         int rowCoord = alternateOnX ? (pos.getX() - originPos.getX()) : (pos.getZ() - originPos.getZ());
         return Math.floorMod(rowCoord, 2) == 0;
     }
+
+    /**
+     * Checks if the given position is within vanilla hydration range (9x9 horizontal, dy in [0, 1])
+     * of any of the planned water holes.
+     */
+    public static boolean isHydratedByHoles(BlockPos pos, Collection<BlockPos> waterHoles) {
+        if (waterHoles == null || waterHoles.isEmpty()) {
+            return false;
+        }
+        for (BlockPos hole : waterHoles) {
+            int dx = Math.abs(pos.getX() - hole.getX());
+            int dz = Math.abs(pos.getZ() - hole.getZ());
+            int dy = hole.getY() - pos.getY();
+            if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Calculates optimal water hole locations for tilling/irrigation when holding a Hoe and Water Bottle.
+     * Places a water hole at the middle/center if unhydrated, and adds extra water holes spaced 8 blocks
+     * apart across large areas to ensure full 100% moisture coverage without dry gaps.
+     */
+    public static List<BlockPos> calculateOptimalWaterHoles(
+            Level level,
+            Collection<BlockPos> tilledPositions,
+            BlockPos clickedPos,
+            int maxWaterHoles
+    ) {
+        if (tilledPositions == null || tilledPositions.size() < 2 || maxWaterHoles <= 0) {
+            return Collections.emptyList();
+        }
+
+        // 1. Identify which positions are NOT yet hydrated by existing world water
+        Set<BlockPos> unhydrated = new HashSet<>();
+        for (BlockPos pos : tilledPositions) {
+            if (!PlantClassifier.isNearWater(level, pos)) {
+                unhydrated.add(pos);
+            }
+        }
+
+        if (unhydrated.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. Find bounding box of tilled positions to locate geometric center
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        for (BlockPos pos : tilledPositions) {
+            minX = Math.min(minX, pos.getX());
+            maxX = Math.max(maxX, pos.getX());
+            minZ = Math.min(minZ, pos.getZ());
+            maxZ = Math.max(maxZ, pos.getZ());
+        }
+        double midX = (minX + maxX) / 2.0;
+        double midZ = (minZ + maxZ) / 2.0;
+
+        // 3. Find the best center block among tilled positions closest to (midX, midZ)
+        BlockPos centerPos = null;
+        double bestDistSq = Double.MAX_VALUE;
+        for (BlockPos pos : tilledPositions) {
+            if (!level.getBlockState(pos.below()).isSolid()) {
+                continue;
+            }
+            double dx = pos.getX() - midX;
+            double dz = pos.getZ() - midZ;
+            double distSq = dx * dx + dz * dz;
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                centerPos = pos;
+            }
+        }
+        if (centerPos == null) {
+            centerPos = clickedPos;
+        }
+
+        // 4. Generate candidate 8-block grid positions centered at centerPos
+        int radiusX = Math.max(1, (maxX - minX + 8) / 8);
+        int radiusZ = Math.max(1, (maxZ - minZ + 8) / 8);
+
+        List<BlockPos> candidates = new ArrayList<>();
+        // Center position is candidate 0
+        candidates.add(centerPos);
+
+        List<int[]> gridOffsets = new ArrayList<>();
+        for (int i = -radiusX; i <= radiusX; i++) {
+            for (int j = -radiusZ; j <= radiusZ; j++) {
+                if (i == 0 && j == 0) continue;
+                gridOffsets.add(new int[]{i, j});
+            }
+        }
+        gridOffsets.sort(Comparator.comparingInt(o -> (o[0] * o[0] + o[1] * o[1])));
+
+        for (int[] offset : gridOffsets) {
+            int targetX = centerPos.getX() + offset[0] * 8;
+            int targetZ = centerPos.getZ() + offset[1] * 8;
+
+            BlockPos bestCandidate = null;
+            double bestDist = Double.MAX_VALUE;
+            for (BlockPos pos : tilledPositions) {
+                int dx = Math.abs(pos.getX() - targetX);
+                int dz = Math.abs(pos.getZ() - targetZ);
+                if (dx <= 1 && dz <= 1 && level.getBlockState(pos.below()).isSolid()) {
+                    double d = dx * dx + dz * dz;
+                    if (d < bestDist) {
+                        bestDist = d;
+                        bestCandidate = pos;
+                    }
+                }
+            }
+            if (bestCandidate != null && !candidates.contains(bestCandidate)) {
+                candidates.add(bestCandidate);
+            }
+        }
+
+        // 5. Greedy set cover: select water holes that maximize unhydrated coverage
+        Set<BlockPos> covered = new HashSet<>();
+        List<BlockPos> selectedHoles = new ArrayList<>();
+
+        for (BlockPos cand : candidates) {
+            if (selectedHoles.size() >= maxWaterHoles) {
+                break;
+            }
+
+            int newlyCovered = 0;
+            for (BlockPos u : unhydrated) {
+                if (!covered.contains(u)) {
+                    int dx = Math.abs(u.getX() - cand.getX());
+                    int dz = Math.abs(u.getZ() - cand.getZ());
+                    int dy = cand.getY() - u.getY();
+                    if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
+                        newlyCovered++;
+                    }
+                }
+            }
+
+            if (newlyCovered > 0) {
+                boolean spacingOk = true;
+                for (BlockPos existing : selectedHoles) {
+                    int dx = Math.abs(cand.getX() - existing.getX());
+                    int dz = Math.abs(cand.getZ() - existing.getZ());
+                    if (Math.max(dx, dz) < 7) {
+                        spacingOk = false;
+                        break;
+                    }
+                }
+
+                if (spacingOk) {
+                    selectedHoles.add(cand);
+                    for (BlockPos u : unhydrated) {
+                        int dx = Math.abs(u.getX() - cand.getX());
+                        int dz = Math.abs(u.getZ() - cand.getZ());
+                        int dy = cand.getY() - u.getY();
+                        if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
+                            covered.add(u);
+                        }
+                    }
+
+                    if (covered.size() >= unhydrated.size()) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        return selectedHoles;
+    }
 }
 

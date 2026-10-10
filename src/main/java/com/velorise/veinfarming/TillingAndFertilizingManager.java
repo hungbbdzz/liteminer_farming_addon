@@ -58,6 +58,49 @@ public class TillingAndFertilizingManager {
                 .sorted(Comparator.comparingInt(p -> p.distManhattan(clickedPos)))
                 .toList();
 
+        // Smart Water Bottle Irrigation:
+        // When holding a Hoe in main hand and a Water Bottle/Bucket in off hand,
+        // automatically dig and place water holes at the center and spaced 8 blocks apart in unhydrated soil.
+        ItemStack offItem = player.getOffhandItem();
+        boolean isMainHoe = PlantClassifier.isHoe(hoeStack);
+        boolean isOffWater = PlantClassifier.isWaterContainer(offItem);
+        boolean canIrrigate = FarmingConfig.SMART_WATER_BOTTLE_IRRIGATION.get()
+                && isMainHoe && isOffWater
+                && sorted.size() >= 2;
+
+        int waterHolesPlaced = 0;
+        if (canIrrigate) {
+            int availableWater = getAvailableWaterCount(player);
+            List<BlockPos> waterHoles = PlantingAlgorithms.calculateOptimalWaterHoles(level, sorted, clickedPos, availableWater);
+            if (!waterHoles.isEmpty()) {
+                for (BlockPos holePos : waterHoles) {
+                    if (consumeOneWaterSource(player)) {
+                        // Clear foliage above if any
+                        BlockPos aboveHole = holePos.above();
+                        BlockState aboveHoleState = level.getBlockState(aboveHole);
+                        if (!aboveHoleState.isAir() && (aboveHoleState.canBeReplaced() || aboveHoleState.is(BlockTags.REPLACEABLE_BY_TREES) || aboveHoleState.is(BlockTags.FLOWERS) || (aboveHoleState.getBlock() instanceof BushBlock))) {
+                            level.destroyBlock(aboveHole, true, player);
+                        }
+
+                        // Place water source block
+                        level.setBlock(holePos, Blocks.WATER.defaultBlockState(), 11);
+                        level.gameEvent(player, GameEvent.BLOCK_CHANGE, holePos);
+
+                        level.playSound(null, holePos, SoundEvents.BOTTLE_EMPTY, SoundSource.BLOCKS, 1.0F, 1.0F);
+                        level.playSound(null, holePos, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 0.7F, 1.2F);
+                        if (level instanceof ServerLevel serverLevel) {
+                            serverLevel.sendParticles(ParticleTypes.SPLASH, holePos.getX() + 0.5, holePos.getY() + 0.9, holePos.getZ() + 0.5, 12, 0.25, 0.1, 0.25, 0.1);
+                            serverLevel.sendParticles(ParticleTypes.DRIPPING_WATER, holePos.getX() + 0.5, holePos.getY() + 0.8, holePos.getZ() + 0.5, 6, 0.2, 0.1, 0.2, 0.05);
+                        }
+                        waterHolesPlaced++;
+                    }
+                }
+
+                Set<BlockPos> holeSet = new HashSet<>(waterHoles);
+                sorted = sorted.stream().filter(p -> !holeSet.contains(p)).toList();
+            }
+        }
+
         int maxLimit = FarmingManager.getEffectiveBlockLimit(player);
         boolean preventBreaking = FarmingManager.shouldPreventToolBreaking(player);
         boolean clearFoliage = FarmingConfig.CLEAR_FOLIAGE.get();
@@ -145,11 +188,11 @@ public class TillingAndFertilizingManager {
             }
         }
 
-        if (tilledCount > 0) {
+        if (tilledCount > 0 || waterHolesPlaced > 0) {
             level.playSound(null, clickedPos, SoundEvents.HOE_TILL, SoundSource.BLOCKS, 1.0F, 1.0F);
             player.swing(hand, true);
             if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
-                FTBUltimineCompat.applyPostUltimineCosts(player, tilledCount);
+                FTBUltimineCompat.applyPostUltimineCosts(player, tilledCount + waterHolesPlaced);
             }
             return true;
         }
@@ -607,6 +650,70 @@ public class TillingAndFertilizingManager {
 
         player.swing(hand, true);
         return true;
+    }
+
+    public static int getAvailableWaterCount(Player player) {
+        if (player.isCreative()) {
+            return Integer.MAX_VALUE;
+        }
+        int count = 0;
+        ItemStack off = player.getOffhandItem();
+        if (PlantClassifier.isWaterBottle(off) || off.is(Items.WATER_BUCKET)) {
+            count += off.getCount();
+        }
+        for (int i = 0; i < player.getInventory().items.size(); i++) {
+            ItemStack stack = player.getInventory().items.get(i);
+            if (PlantClassifier.isWaterBottle(stack) || stack.is(Items.WATER_BUCKET)) {
+                count += stack.getCount();
+            }
+        }
+        return count;
+    }
+
+    public static boolean consumeOneWaterSource(Player player) {
+        if (player.isCreative()) {
+            return true;
+        }
+        // 1. Off-hand first
+        ItemStack off = player.getOffhandItem();
+        if (PlantClassifier.isWaterBottle(off)) {
+            if (off.getCount() == 1) {
+                player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.GLASS_BOTTLE));
+            } else {
+                off.shrink(1);
+                giveOrDropItem(player, new ItemStack(Items.GLASS_BOTTLE));
+            }
+            return true;
+        } else if (off.is(Items.WATER_BUCKET)) {
+            if (off.getCount() == 1) {
+                player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.BUCKET));
+            } else {
+                off.shrink(1);
+                giveOrDropItem(player, new ItemStack(Items.BUCKET));
+            }
+            return true;
+        }
+
+        // 2. Inventory
+        for (int i = 0; i < player.getInventory().items.size(); i++) {
+            ItemStack stack = player.getInventory().items.get(i);
+            if (PlantClassifier.isWaterBottle(stack)) {
+                stack.shrink(1);
+                giveOrDropItem(player, new ItemStack(Items.GLASS_BOTTLE));
+                return true;
+            } else if (stack.is(Items.WATER_BUCKET)) {
+                stack.shrink(1);
+                giveOrDropItem(player, new ItemStack(Items.BUCKET));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void giveOrDropItem(Player player, ItemStack stack) {
+        if (!player.getInventory().add(stack)) {
+            player.drop(stack, false);
+        }
     }
 }
 

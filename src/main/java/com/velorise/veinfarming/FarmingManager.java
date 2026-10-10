@@ -183,7 +183,17 @@ public class FarmingManager {
     public static boolean isJungleLog(BlockState state) { return PlantClassifier.isJungleLog(state); }
     public static boolean isKnife(ItemStack stack) { return PlantClassifier.isKnife(stack); }
     public static boolean isCompostable(ItemStack stack) { return PlantClassifier.isCompostable(stack); }
+    public static boolean isHoe(ItemStack stack) { return PlantClassifier.isHoe(stack); }
     public static boolean isNearWater(LevelReader level, BlockPos pos) { return PlantClassifier.isNearWater(level, pos); }
+    public static boolean isWaterBottle(ItemStack stack) { return PlantClassifier.isWaterBottle(stack); }
+    public static boolean isWaterContainer(ItemStack stack) { return PlantClassifier.isWaterContainer(stack); }
+    public static int getAvailableWaterCount(Player player) { return TillingAndFertilizingManager.getAvailableWaterCount(player); }
+    public static List<BlockPos> calculateOptimalWaterHoles(Level level, Collection<BlockPos> tilledPositions, BlockPos clickedPos, int maxWaterHoles) {
+        return PlantingAlgorithms.calculateOptimalWaterHoles(level, tilledPositions, clickedPos, maxWaterHoles);
+    }
+    public static boolean isHydratedByHoles(BlockPos pos, Collection<BlockPos> waterHoles) {
+        return PlantingAlgorithms.isHydratedByHoles(pos, waterHoles);
+    }
     public static boolean isSapling(ItemStack stack) { return PlantClassifier.isSapling(stack); }
     public static boolean isSaplingBlock(Block block) { return PlantClassifier.isSaplingBlock(block); }
     public static boolean isStrictly2x2Sapling(Block block) { return PlantClassifier.isStrictly2x2Sapling(block); }

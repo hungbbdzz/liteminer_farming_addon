@@ -18,6 +18,7 @@ public class FarmingConfig {
     public static final ModConfigSpec.BooleanValue REPLANT_CROPS;
     public static final ModConfigSpec.BooleanValue PREVENT_TOOL_BREAKING;
     public static final ModConfigSpec.BooleanValue CLEAR_FOLIAGE;
+    public static final ModConfigSpec.BooleanValue SMART_WATER_BOTTLE_IRRIGATION;
     public static final ModConfigSpec.BooleanValue BATCH_COMPOSTER;
 
     // --- Secondary & Advanced Settings ---
@@ -101,6 +102,10 @@ public class FarmingConfig {
         CLEAR_FOLIAGE = builder
                 .comment("Automatically clear replaceable plants/grass above dirt when mass hoeing.")
                 .define("clear_foliage", true);
+
+        SMART_WATER_BOTTLE_IRRIGATION = builder
+                .comment("When holding a Hoe in main hand and a Water Bottle in off hand, automatically creates water irrigation holes spaced 8 blocks apart in unhydrated areas.")
+                .define("smart_water_bottle_irrigation", true);
 
         BATCH_COMPOSTER = builder
                 .comment("Holding Sneak and right-clicking a Composter with seeds or compostables instantly processes the entire stack into Bone Meal in one click.")

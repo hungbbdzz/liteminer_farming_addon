@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -49,6 +50,7 @@ public class StandaloneHighlightRenderer {
     private boolean cachedIsHoe = false;
     private BlockState cachedGhostPlantState = null;
     private BlockState cachedGhostOffState = null;
+    private List<BlockPos> cachedPlannedWaterHoles = Collections.emptyList();
     private boolean lastSmartPlantEnabled = true;
 
     private boolean lastWasAttacking = false;
@@ -64,6 +66,7 @@ public class StandaloneHighlightRenderer {
         cachedIsHoe = false;
         cachedGhostPlantState = null;
         cachedGhostOffState = null;
+        cachedPlannedWaterHoles = Collections.emptyList();
     }
 
     @SubscribeEvent
@@ -132,6 +135,7 @@ public class StandaloneHighlightRenderer {
                 && (now - lastCacheTime < 250);
 
         Collection<BlockPos> previewBlocks;
+        List<BlockPos> plannedWaterHoles;
         float r, g, b, a;
         boolean isPlanting;
         boolean isHoe;
@@ -140,6 +144,7 @@ public class StandaloneHighlightRenderer {
 
         if (cacheValid) {
             previewBlocks = cachedPreviewBlocks;
+            plannedWaterHoles = cachedPlannedWaterHoles;
             r = cachedR; g = cachedG; b = cachedB; a = cachedA;
             isPlanting = cachedIsPlanting;
             isHoe = cachedIsHoe;
@@ -147,6 +152,7 @@ public class StandaloneHighlightRenderer {
             ghostOffState = cachedGhostOffState;
         } else {
             previewBlocks = Collections.emptyList();
+            plannedWaterHoles = Collections.emptyList();
             r = 1.0f; g = 0.82f; b = 0.2f; a = 0.8f; // Default golden harvest
             isPlanting = false;
             isHoe = false;
@@ -193,6 +199,10 @@ public class StandaloneHighlightRenderer {
                 previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
                 r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
                 isHoe = true;
+                if (PlantClassifier.isWaterContainer(offItem) && FarmingConfig.SMART_WATER_BOTTLE_IRRIGATION.get() && previewBlocks.size() >= 2) {
+                    int availableWater = FarmingManager.getAvailableWaterCount(player);
+                    plannedWaterHoles = FarmingManager.calculateOptimalWaterHoles(level, previewBlocks, clickedPos, availableWater);
+                }
             } else if (FarmingManager.isPlantableSeed(heldItem) && (
                     FarmingManager.isCocoaBean(heldItem)
                         ? (FarmingManager.isJungleLog(clickedState) || clickedState.getBlock() instanceof CocoaBlock)
@@ -234,6 +244,7 @@ public class StandaloneHighlightRenderer {
             lastWasAttacking = isAttacking;
             lastCacheTime = now;
             cachedPreviewBlocks = previewBlocks;
+            cachedPlannedWaterHoles = plannedWaterHoles;
             cachedR = r; cachedG = g; cachedB = b; cachedA = a;
             cachedIsPlanting = isPlanting;
             cachedIsHoe = isHoe;
@@ -288,13 +299,18 @@ public class StandaloneHighlightRenderer {
             float boxR = r, boxG = g, boxB = b;
             float currentAlpha = lineAlpha;
             if (isHoe && FarmingConfig.SMART_IRRIGATION_PREVIEW.get()) {
-                boolean hasWater = FarmingManager.isNearWater(level, pos);
-                if (hasWater) {
-                    boxR = 0.45f; boxG = 0.65f; boxB = 0.35f; // Hydrated Farmland Green-Brown
-                    currentAlpha = 0.40f;
+                if (plannedWaterHoles.contains(pos)) {
+                    boxR = 0.15f; boxG = 0.65f; boxB = 1.0f; // Azure Water Blue
+                    currentAlpha = 0.85f;
                 } else {
-                    boxR = 0.95f; boxG = 0.45f; boxB = 0.15f; // Warning Dry Amber/Orange
-                    currentAlpha = 0.65f;
+                    boolean hasWater = FarmingManager.isNearWater(level, pos) || FarmingManager.isHydratedByHoles(pos, plannedWaterHoles);
+                    if (hasWater) {
+                        boxR = 0.45f; boxG = 0.65f; boxB = 0.35f; // Hydrated Farmland Green-Brown
+                        currentAlpha = 0.40f;
+                    } else {
+                        boxR = 0.95f; boxG = 0.45f; boxB = 0.15f; // Warning Dry Amber/Orange
+                        currentAlpha = 0.65f;
+                    }
                 }
             } else if (isPlanting && plannedIntercrop != null && FarmingConfig.GROWTH_PENALTY_WARNING.get()) {
                 Block plannedCrop = plannedIntercrop.get(renderPos);
@@ -314,38 +330,63 @@ public class StandaloneHighlightRenderer {
         poseStack.popPose();
         bufferSource.endBatch(RenderType.lines());
 
-        // Render faded 3D ghost block preview of Farmland when holding a hoe
+        // Render faded 3D ghost block preview of Farmland (and planned Water Holes) when holding a hoe
         if (isHoe && FarmingConfig.GHOST_FARMLAND_PREVIEW.get() && !previewBlocks.isEmpty()) {
             VertexConsumer translucentConsumer = bufferSource.getBuffer(RenderType.translucent());
             for (BlockPos pos : previewBlocks) {
                 BlockState targetState = level.getBlockState(pos);
                 VoxelShape shape = targetState.getShape(level, pos);
                 double blockTop = shape.isEmpty() ? 1.0 : shape.max(Direction.Axis.Y);
-                // Farmland model is 0.9375 (15/16) tall. Elevate so top face sits 0.003 above the block surface (eliminating grass occlusion and dirt path z-fighting)
-                double yOffset = (blockTop - 0.9375) + 0.003;
 
-                boolean hasWater = FarmingManager.isNearWater(level, pos);
-                BlockState farmlandState = Blocks.FARMLAND.defaultBlockState()
-                        .setValue(FarmBlock.MOISTURE, hasWater ? 7 : 0);
-                float alpha = hasWater ? 0.70f : 0.50f;
-                FadedVertexConsumer fadedConsumer = new FadedVertexConsumer(translucentConsumer, alpha);
-                MultiBufferSource fadedBuffer = type -> fadedConsumer;
+                if (plannedWaterHoles.contains(pos)) {
+                    // Render translucent water hole preview (using Light Blue Stained Glass model for fluid rendering compatibility)
+                    double yOffset = (blockTop - 1.0) + 0.003;
+                    BlockState waterGhost = Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState();
+                    FadedVertexConsumer fadedConsumer = new FadedVertexConsumer(translucentConsumer, 0.65f);
+                    MultiBufferSource fadedBuffer = type -> fadedConsumer;
 
-                poseStack.pushPose();
-                poseStack.translate(pos.getX() - camPos.x + 0.5, pos.getY() - camPos.y + yOffset, pos.getZ() - camPos.z + 0.5);
-                poseStack.scale(1.002f, 1.0f, 1.002f);
-                poseStack.translate(-0.5, 0.0, -0.5);
-                int light = LevelRenderer.getLightColor(level, pos.above());
-                mc.getBlockRenderer().renderSingleBlock(
-                        farmlandState,
-                        poseStack,
-                        fadedBuffer,
-                        light,
-                        net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
-                        net.neoforged.neoforge.client.model.data.ModelData.EMPTY,
-                        RenderType.translucent()
-                );
-                poseStack.popPose();
+                    poseStack.pushPose();
+                    poseStack.translate(pos.getX() - camPos.x + 0.5, pos.getY() - camPos.y + yOffset, pos.getZ() - camPos.z + 0.5);
+                    poseStack.scale(1.002f, 1.0f, 1.002f);
+                    poseStack.translate(-0.5, 0.0, -0.5);
+                    int light = LevelRenderer.getLightColor(level, pos.above());
+                    mc.getBlockRenderer().renderSingleBlock(
+                            waterGhost,
+                            poseStack,
+                            fadedBuffer,
+                            light,
+                            net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
+                            net.neoforged.neoforge.client.model.data.ModelData.EMPTY,
+                            RenderType.translucent()
+                    );
+                    poseStack.popPose();
+                } else {
+                    // Farmland model is 0.9375 (15/16) tall. Elevate so top face sits 0.003 above the block surface (eliminating grass occlusion and dirt path z-fighting)
+                    double yOffset = (blockTop - 0.9375) + 0.003;
+
+                    boolean hasWater = FarmingManager.isNearWater(level, pos) || FarmingManager.isHydratedByHoles(pos, plannedWaterHoles);
+                    BlockState farmlandState = Blocks.FARMLAND.defaultBlockState()
+                            .setValue(FarmBlock.MOISTURE, hasWater ? 7 : 0);
+                    float alpha = hasWater ? 0.70f : 0.50f;
+                    FadedVertexConsumer fadedConsumer = new FadedVertexConsumer(translucentConsumer, alpha);
+                    MultiBufferSource fadedBuffer = type -> fadedConsumer;
+
+                    poseStack.pushPose();
+                    poseStack.translate(pos.getX() - camPos.x + 0.5, pos.getY() - camPos.y + yOffset, pos.getZ() - camPos.z + 0.5);
+                    poseStack.scale(1.002f, 1.0f, 1.002f);
+                    poseStack.translate(-0.5, 0.0, -0.5);
+                    int light = LevelRenderer.getLightColor(level, pos.above());
+                    mc.getBlockRenderer().renderSingleBlock(
+                            farmlandState,
+                            poseStack,
+                            fadedBuffer,
+                            light,
+                            net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
+                            net.neoforged.neoforge.client.model.data.ModelData.EMPTY,
+                            RenderType.translucent()
+                    );
+                    poseStack.popPose();
+                }
             }
             bufferSource.endBatch(RenderType.translucent());
         }

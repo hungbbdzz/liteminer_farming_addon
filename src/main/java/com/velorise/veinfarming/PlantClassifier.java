@@ -250,6 +250,29 @@ public class PlantClassifier {
         return false;
     }
 
+    public static boolean isWaterBottle(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        if (stack.is(Items.POTION) || stack.is(Items.SPLASH_POTION) || stack.is(Items.LINGERING_POTION)) {
+            net.minecraft.world.item.alchemy.PotionContents contents = stack.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS);
+            return contents != null && contents.is(net.minecraft.world.item.alchemy.Potions.WATER);
+        }
+        return false;
+    }
+
+    public static boolean isWaterContainer(ItemStack stack) {
+        return isWaterBottle(stack) || (stack != null && stack.is(Items.WATER_BUCKET));
+    }
+
+    public static boolean isHoe(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        return stack.canPerformAction(net.neoforged.neoforge.common.ItemAbilities.HOE_TILL)
+                || stack.getItem() instanceof net.minecraft.world.item.HoeItem;
+    }
+
     /**
      * Checks if the given ItemStack represents a sapling (vanilla or modded).
      */
