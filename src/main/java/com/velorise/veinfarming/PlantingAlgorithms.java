@@ -830,6 +830,10 @@ public class PlantingAlgorithms {
             return false;
         }
         for (BlockPos w : waterSources) {
+            int dy = Math.abs(cand.getY() - w.getY());
+            if (dy > 1) {
+                continue; // Ignore water sources on different vertical planes (e.g. underground caves)
+            }
             int dx = Math.abs(cand.getX() - w.getX());
             int dz = Math.abs(cand.getZ() - w.getZ());
             if (Math.max(dx, dz) < minSpacing) {
@@ -1122,9 +1126,8 @@ public class PlantingAlgorithms {
 
         // 8. Full Coverage Rescue - Pass 2: Guarantee All Farmland Irrigated
         // If Pass 1 left orphan/dead-zone farmland unhydrated (e.g. narrow peninsulas, irregular edges,
-        // or pockets surrounded by existing water at distance 5-7), gracefully place rescue water holes
-        // to ensure 100% of the farmland is hydrated without leaving dry dead dirt.
-        int rescueMinSpacing = 4; // Start with minimum 4 blocks separation (at least 3 farmland blocks between water holes)
+        // or narrow pockets surrounded by existing water at distance 5-7),
+        // place rescue water holes so that 100% of the farmland is hydrated!
         while (selectedHoles.size() < maxWaterHoles && covered.size() < unhydrated.size()) {
             BlockPos bestRescue = null;
             int maxNewlyCovered = 0;
@@ -1132,16 +1135,10 @@ public class PlantingAlgorithms {
             double bestDistToCenter = Double.MAX_VALUE;
 
             for (BlockPos cand : tilledPositions) {
-                if (selectedHoles.contains(cand)) {
+                if (selectedHoles.contains(cand) || existingWorldWaters.contains(cand)) {
                     continue;
                 }
                 if (!level.getBlockState(cand.below()).isSolid()) {
-                    continue;
-                }
-
-                // Minimum sanity distance: never place water right next to another water hole
-                if (isTooCloseToWater(cand, existingWorldWaters, rescueMinSpacing)
-                        || isTooCloseToWater(cand, selectedHoles, rescueMinSpacing)) {
                     continue;
                 }
 
@@ -1159,24 +1156,48 @@ public class PlantingAlgorithms {
                 }
 
                 if (newlyCovered > 0) {
-                    // Calculate Chebyshev distance to nearest water source to maximize spacing
+                    // Calculate Chebyshev distance to nearest water source on the same plane
                     int minDistToWater = Integer.MAX_VALUE;
                     for (BlockPos w : existingWorldWaters) {
-                        minDistToWater = Math.min(minDistToWater, Math.max(Math.abs(cand.getX() - w.getX()), Math.abs(cand.getZ() - w.getZ())));
+                        if (Math.abs(cand.getY() - w.getY()) <= 1) {
+                            minDistToWater = Math.min(minDistToWater, Math.max(Math.abs(cand.getX() - w.getX()), Math.abs(cand.getZ() - w.getZ())));
+                        }
                     }
                     for (BlockPos w : selectedHoles) {
-                        minDistToWater = Math.min(minDistToWater, Math.max(Math.abs(cand.getX() - w.getX()), Math.abs(cand.getZ() - w.getZ())));
+                        if (Math.abs(cand.getY() - w.getY()) <= 1) {
+                            minDistToWater = Math.min(minDistToWater, Math.max(Math.abs(cand.getX() - w.getX()), Math.abs(cand.getZ() - w.getZ())));
+                        }
                     }
 
                     double distToClicked = cand.distSqr(clickedPos);
 
                     // Ranking criteria:
-                    // 1. Maximize newly covered unhydrated blocks
-                    // 2. Maximize distance to closest water (centers the hole in the dead zone, furthest from existing water)
-                    // 3. Minimize distance to clicked position
-                    if (newlyCovered > maxNewlyCovered
-                            || (newlyCovered == maxNewlyCovered && minDistToWater > bestMinDistToWater)
-                            || (newlyCovered == maxNewlyCovered && minDistToWater == bestMinDistToWater && distToClicked < bestDistToCenter)) {
+                    // 1. Strongly prefer candidates that are not directly touching existing water (minDistToWater >= 2)
+                    // 2. Maximize newly covered unhydrated blocks
+                    // 3. Maximize distance to nearest water (centers the hole in the dry zone, furthest from existing water)
+                    // 4. Minimize distance to clicked position
+                    boolean isBetter = false;
+                    if (bestRescue == null) {
+                        isBetter = true;
+                    } else {
+                        boolean currentAvoidsAdjacent = bestMinDistToWater >= 2;
+                        boolean candAvoidsAdjacent = minDistToWater >= 2;
+                        if (candAvoidsAdjacent && !currentAvoidsAdjacent) {
+                            isBetter = true;
+                        } else if (!candAvoidsAdjacent && currentAvoidsAdjacent) {
+                            isBetter = false;
+                        } else if (newlyCovered > maxNewlyCovered) {
+                            isBetter = true;
+                        } else if (newlyCovered == maxNewlyCovered) {
+                            if (minDistToWater > bestMinDistToWater) {
+                                isBetter = true;
+                            } else if (minDistToWater == bestMinDistToWater && distToClicked < bestDistToCenter) {
+                                isBetter = true;
+                            }
+                        }
+                    }
+
+                    if (isBetter) {
                         maxNewlyCovered = newlyCovered;
                         bestMinDistToWater = minDistToWater;
                         bestDistToCenter = distToClicked;
@@ -1186,12 +1207,6 @@ public class PlantingAlgorithms {
             }
 
             if (bestRescue == null || maxNewlyCovered == 0) {
-                // If rescueMinSpacing = 4 couldn't find a spot (e.g. an extremely narrow 1-wide pocket),
-                // step down to 3 or 2 to guarantee irrigation
-                if (rescueMinSpacing > 2) {
-                    rescueMinSpacing--;
-                    continue;
-                }
                 break;
             }
 
