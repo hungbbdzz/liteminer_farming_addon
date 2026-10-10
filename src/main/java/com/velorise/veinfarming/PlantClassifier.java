@@ -66,6 +66,7 @@ public class PlantClassifier {
 
     public static final TagKey<Item> C_KNIVES = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "tools/knives"));
     public static final TagKey<Item> FD_KNIVES = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("farmersdelight", "tools/knives"));
+    public static final TagKey<Item> C_WATER_BUCKETS = TagKey.create(Registries.ITEM, ResourceLocation.fromNamespaceAndPath("c", "buckets/water"));
 
     private static final Map<Block, Boolean> SUPPORTED_2X2_CACHE = new ConcurrentHashMap<>();
     private static final Map<Block, Boolean> STRICT_2X2_CACHE = new ConcurrentHashMap<>();
@@ -250,19 +251,23 @@ public class PlantClassifier {
         return false;
     }
 
-    public static boolean isWaterBottle(ItemStack stack) {
+    public static boolean isWaterContainer(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return false;
         }
-        if (stack.is(Items.POTION) || stack.is(Items.SPLASH_POTION) || stack.is(Items.LINGERING_POTION)) {
-            net.minecraft.world.item.alchemy.PotionContents contents = stack.get(net.minecraft.core.component.DataComponents.POTION_CONTENTS);
-            return contents != null && contents.is(net.minecraft.world.item.alchemy.Potions.WATER);
+        if (stack.is(Items.WATER_BUCKET) || stack.is(C_WATER_BUCKETS)) {
+            return true;
+        }
+        var fluidHandler = stack.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.ITEM);
+        if (fluidHandler != null) {
+            for (int i = 0; i < fluidHandler.getTanks(); i++) {
+                var fluidStack = fluidHandler.getFluidInTank(i);
+                if (!fluidStack.isEmpty() && fluidStack.getFluid().isSame(net.minecraft.world.level.material.Fluids.WATER) && fluidStack.getAmount() >= 1000) {
+                    return true;
+                }
+            }
         }
         return false;
-    }
-
-    public static boolean isWaterContainer(ItemStack stack) {
-        return isWaterBottle(stack) || (stack != null && stack.is(Items.WATER_BUCKET));
     }
 
     public static boolean isHoe(ItemStack stack) {

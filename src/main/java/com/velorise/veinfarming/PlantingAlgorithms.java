@@ -820,7 +820,7 @@ public class PlantingAlgorithms {
     }
 
     /**
-     * Calculates optimal water hole locations for tilling/irrigation when holding a Hoe and Water Bottle.
+     * Calculates optimal water hole locations for tilling/irrigation when holding a Hoe and Water Bucket.
      * Places a water hole at the middle/center if unhydrated, and adds extra water holes spaced 8 blocks
      * apart across large areas to ensure full 100% moisture coverage without dry gaps.
      */

@@ -199,7 +199,7 @@ public class StandaloneHighlightRenderer {
                 previewBlocks = FarmingManager.fallbackHoeSearch(player, hand, clickedPos);
                 r = 0.65f; g = 0.45f; b = 0.25f; // Earth Farmland Brown
                 isHoe = true;
-                if (PlantClassifier.isWaterContainer(offItem) && FarmingConfig.SMART_WATER_BOTTLE_IRRIGATION.get() && previewBlocks.size() >= 2) {
+                if (PlantClassifier.isWaterContainer(offItem) && FarmingConfig.SMART_WATER_BUCKET_IRRIGATION.get() && previewBlocks.size() >= 2) {
                     int availableWater = FarmingManager.getAvailableWaterCount(player);
                     plannedWaterHoles = FarmingManager.calculateOptimalWaterHoles(level, previewBlocks, clickedPos, availableWater);
                 }

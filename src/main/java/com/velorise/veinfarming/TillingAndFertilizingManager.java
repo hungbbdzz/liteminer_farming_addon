@@ -58,13 +58,13 @@ public class TillingAndFertilizingManager {
                 .sorted(Comparator.comparingInt(p -> p.distManhattan(clickedPos)))
                 .toList();
 
-        // Smart Water Bottle Irrigation:
-        // When holding a Hoe in main hand and a Water Bottle/Bucket in off hand,
+        // Smart Water Bucket Irrigation:
+        // When holding a Hoe in main hand and a Water Bucket (or fluid container with water) in off hand,
         // automatically dig and place water holes at the center and spaced 8 blocks apart in unhydrated soil.
         ItemStack offItem = player.getOffhandItem();
         boolean isMainHoe = PlantClassifier.isHoe(hoeStack);
         boolean isOffWater = PlantClassifier.isWaterContainer(offItem);
-        boolean canIrrigate = FarmingConfig.SMART_WATER_BOTTLE_IRRIGATION.get()
+        boolean canIrrigate = FarmingConfig.SMART_WATER_BUCKET_IRRIGATION.get()
                 && isMainHoe && isOffWater
                 && sorted.size() >= 2;
 
@@ -86,10 +86,9 @@ public class TillingAndFertilizingManager {
                         level.setBlock(holePos, Blocks.WATER.defaultBlockState(), 11);
                         level.gameEvent(player, GameEvent.BLOCK_CHANGE, holePos);
 
-                        level.playSound(null, holePos, SoundEvents.BOTTLE_EMPTY, SoundSource.BLOCKS, 1.0F, 1.0F);
-                        level.playSound(null, holePos, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 0.7F, 1.2F);
+                        level.playSound(null, holePos, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 1.0F, 1.0F);
                         if (level instanceof ServerLevel serverLevel) {
-                            serverLevel.sendParticles(ParticleTypes.SPLASH, holePos.getX() + 0.5, holePos.getY() + 0.9, holePos.getZ() + 0.5, 12, 0.25, 0.1, 0.25, 0.1);
+                            serverLevel.sendParticles(ParticleTypes.SPLASH, holePos.getX() + 0.5, holePos.getY() + 0.9, holePos.getZ() + 0.5, 14, 0.25, 0.1, 0.25, 0.1);
                             serverLevel.sendParticles(ParticleTypes.DRIPPING_WATER, holePos.getX() + 0.5, holePos.getY() + 0.8, holePos.getZ() + 0.5, 6, 0.2, 0.1, 0.2, 0.05);
                         }
                         waterHolesPlaced++;
@@ -658,13 +657,33 @@ public class TillingAndFertilizingManager {
         }
         int count = 0;
         ItemStack off = player.getOffhandItem();
-        if (PlantClassifier.isWaterBottle(off) || off.is(Items.WATER_BUCKET)) {
-            count += off.getCount();
+        if (PlantClassifier.isWaterContainer(off)) {
+            var fluidHandler = off.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.ITEM);
+            if (fluidHandler != null && !off.is(Items.WATER_BUCKET) && !off.is(PlantClassifier.C_WATER_BUCKETS)) {
+                for (int t = 0; t < fluidHandler.getTanks(); t++) {
+                    var fluid = fluidHandler.getFluidInTank(t);
+                    if (!fluid.isEmpty() && fluid.getFluid().isSame(net.minecraft.world.level.material.Fluids.WATER)) {
+                        count += fluid.getAmount() / 1000;
+                    }
+                }
+            } else {
+                count += off.getCount();
+            }
         }
         for (int i = 0; i < player.getInventory().items.size(); i++) {
             ItemStack stack = player.getInventory().items.get(i);
-            if (PlantClassifier.isWaterBottle(stack) || stack.is(Items.WATER_BUCKET)) {
-                count += stack.getCount();
+            if (PlantClassifier.isWaterContainer(stack)) {
+                var fluidHandler = stack.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.ITEM);
+                if (fluidHandler != null && !stack.is(Items.WATER_BUCKET) && !stack.is(PlantClassifier.C_WATER_BUCKETS)) {
+                    for (int t = 0; t < fluidHandler.getTanks(); t++) {
+                        var fluid = fluidHandler.getFluidInTank(t);
+                        if (!fluid.isEmpty() && fluid.getFluid().isSame(net.minecraft.world.level.material.Fluids.WATER)) {
+                            count += fluid.getAmount() / 1000;
+                        }
+                    }
+                } else {
+                    count += stack.getCount();
+                }
             }
         }
         return count;
@@ -676,35 +695,41 @@ public class TillingAndFertilizingManager {
         }
         // 1. Off-hand first
         ItemStack off = player.getOffhandItem();
-        if (PlantClassifier.isWaterBottle(off)) {
-            if (off.getCount() == 1) {
-                player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.GLASS_BOTTLE));
-            } else {
-                off.shrink(1);
-                giveOrDropItem(player, new ItemStack(Items.GLASS_BOTTLE));
+        if (PlantClassifier.isWaterContainer(off)) {
+            var fluidHandler = off.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.ITEM);
+            if (fluidHandler != null && !off.is(Items.WATER_BUCKET) && !off.is(PlantClassifier.C_WATER_BUCKETS)) {
+                var drained = fluidHandler.drain(1000, net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+                if (!drained.isEmpty() && drained.getAmount() >= 1000) {
+                    return true;
+                }
             }
-            return true;
-        } else if (off.is(Items.WATER_BUCKET)) {
-            if (off.getCount() == 1) {
-                player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.BUCKET));
-            } else {
-                off.shrink(1);
-                giveOrDropItem(player, new ItemStack(Items.BUCKET));
+            if (off.is(Items.WATER_BUCKET) || off.is(PlantClassifier.C_WATER_BUCKETS)) {
+                if (off.getCount() == 1) {
+                    player.setItemInHand(InteractionHand.OFF_HAND, new ItemStack(Items.BUCKET));
+                } else {
+                    off.shrink(1);
+                    giveOrDropItem(player, new ItemStack(Items.BUCKET));
+                }
+                return true;
             }
-            return true;
         }
 
         // 2. Inventory
         for (int i = 0; i < player.getInventory().items.size(); i++) {
             ItemStack stack = player.getInventory().items.get(i);
-            if (PlantClassifier.isWaterBottle(stack)) {
-                stack.shrink(1);
-                giveOrDropItem(player, new ItemStack(Items.GLASS_BOTTLE));
-                return true;
-            } else if (stack.is(Items.WATER_BUCKET)) {
-                stack.shrink(1);
-                giveOrDropItem(player, new ItemStack(Items.BUCKET));
-                return true;
+            if (PlantClassifier.isWaterContainer(stack)) {
+                var fluidHandler = stack.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.ITEM);
+                if (fluidHandler != null && !stack.is(Items.WATER_BUCKET) && !stack.is(PlantClassifier.C_WATER_BUCKETS)) {
+                    var drained = fluidHandler.drain(1000, net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+                    if (!drained.isEmpty() && drained.getAmount() >= 1000) {
+                        return true;
+                    }
+                }
+                if (stack.is(Items.WATER_BUCKET) || stack.is(PlantClassifier.C_WATER_BUCKETS)) {
+                    stack.shrink(1);
+                    giveOrDropItem(player, new ItemStack(Items.BUCKET));
+                    return true;
+                }
             }
         }
         return false;

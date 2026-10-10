@@ -43,7 +43,7 @@ public class FarmingConfigScreen extends Screen {
     private boolean replantCrops;
     private boolean preventToolBreaking;
     private boolean clearFoliage;
-    private boolean smartWaterBottleIrrigation;
+    private boolean smartWaterBucketIrrigation;
     private boolean batchComposter;
     private boolean smartBonemeal;
     private boolean preventTrample;
@@ -74,7 +74,7 @@ public class FarmingConfigScreen extends Screen {
         this.replantCrops = FarmingConfig.REPLANT_CROPS.get();
         this.preventToolBreaking = FarmingConfig.PREVENT_TOOL_BREAKING.get();
         this.clearFoliage = FarmingConfig.CLEAR_FOLIAGE.get();
-        this.smartWaterBottleIrrigation = FarmingConfig.SMART_WATER_BOTTLE_IRRIGATION.get();
+        this.smartWaterBucketIrrigation = FarmingConfig.SMART_WATER_BUCKET_IRRIGATION.get();
         this.batchComposter = FarmingConfig.BATCH_COMPOSTER.get();
         this.smartBonemeal = FarmingConfig.SMART_BONEMEAL.get();
         this.preventTrample = FarmingConfig.PREVENT_FARMLAND_TRAMPLE.get();
@@ -100,7 +100,7 @@ public class FarmingConfigScreen extends Screen {
         FarmingConfig.REPLANT_CROPS.set(this.replantCrops);
         FarmingConfig.PREVENT_TOOL_BREAKING.set(this.preventToolBreaking);
         FarmingConfig.CLEAR_FOLIAGE.set(this.clearFoliage);
-        FarmingConfig.SMART_WATER_BOTTLE_IRRIGATION.set(this.smartWaterBottleIrrigation);
+        FarmingConfig.SMART_WATER_BUCKET_IRRIGATION.set(this.smartWaterBucketIrrigation);
         FarmingConfig.BATCH_COMPOSTER.set(this.batchComposter);
         FarmingConfig.SMART_BONEMEAL.set(this.smartBonemeal);
         FarmingConfig.PREVENT_FARMLAND_TRAMPLE.set(this.preventTrample);
@@ -128,7 +128,7 @@ public class FarmingConfigScreen extends Screen {
         this.replantCrops = true;
         this.preventToolBreaking = true;
         this.clearFoliage = true;
-        this.smartWaterBottleIrrigation = true;
+        this.smartWaterBucketIrrigation = true;
         this.batchComposter = true;
         this.smartBonemeal = true;
         this.preventTrample = true;
@@ -255,11 +255,11 @@ public class FarmingConfigScreen extends Screen {
                 "Automatically clears weeds, grass, and flowers above dirt when tilling.",
                 val -> this.clearFoliage = val));
 
-        // 13. Smart Water Bottle Irrigation (ON/OFF)
+        // 13. Smart Water Bucket Irrigation (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,
-                "Water Bottle Irrigation", this.smartWaterBottleIrrigation,
-                "When holding a Hoe (main) and Water Bottle (off), automatically digs 8-block spaced water holes in dry soil.",
-                val -> this.smartWaterBottleIrrigation = val));
+                "Water Bucket Irrigation", this.smartWaterBucketIrrigation,
+                "When holding a Hoe (main) and Water Bucket (off), automatically digs 8-block spaced water holes in dry soil.",
+                val -> this.smartWaterBucketIrrigation = val));
 
         // 14. Batch Composter (ON/OFF)
         this.list.addConfigEntry(createBooleanButton(widgetWidth, widgetHeight,

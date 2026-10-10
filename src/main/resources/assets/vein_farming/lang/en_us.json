@@ -15,7 +15,7 @@
   "config.vein_farming.prevent_tool_breaking": "Prevent Tool Breaking",
   "config.vein_farming.pull_from_inventory": "Pull Seeds & Bone Meal from Inventory",
   "config.vein_farming.clear_foliage": "Clear Replaceable Foliage when Hoeing",
-  "config.vein_farming.smart_water_bottle_irrigation": "Water Bottle Irrigation",
+  "config.vein_farming.smart_water_bucket_irrigation": "Water Bucket Irrigation",
   "config.vein_farming.exhaustion_per_block": "Exhaustion Per Block",
   "config.vein_farming.bedrock_flower_bonemeal": "Bedrock-style Flower Bone Meal Propagation"
 }
