@@ -15,11 +15,16 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.HoeItem;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.util.Mth;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.ItemAbilities;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.tick.EntityTickEvent;
 
 public class FarmingEventHandler {
 
@@ -31,6 +36,56 @@ public class FarmingEventHandler {
     public void onFarmlandTrample(BlockEvent.FarmlandTrampleEvent event) {
         if (FarmingConfig.PREVENT_FARMLAND_TRAMPLE.get()) {
             event.setCanceled(true);
+        }
+    }
+
+    /**
+     * Universal Farmland Anti-Trample Fall Cushion:
+     * Many modded farmlands (such as Regions Unexplored's Peat/Silt Farmland) override fallOn()
+     * and bypass NeoForge's FarmlandTrampleEvent by calling turnToDirt() directly.
+     * When an entity falls onto ANY farmland (vanilla or modded), this listener resets the fall
+     * distance right before impact, eliminating trample damage across all modded farmlands.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onEntityTick(EntityTickEvent.Pre event) {
+        if (!FarmingConfig.PREVENT_FARMLAND_TRAMPLE.get()) {
+            return;
+        }
+
+        Entity entity = event.getEntity();
+        if (entity.level().isClientSide()) {
+            return;
+        }
+
+        if (entity instanceof LivingEntity living && living.fallDistance > 0.0F) {
+            Level level = living.level();
+            double checkDepth = Math.max(0.6, -living.getDeltaMovement().y + 0.2);
+            AABB box = living.getBoundingBox().expandTowards(0, -checkDepth, 0);
+            int minX = Mth.floor(box.minX);
+            int maxX = Mth.floor(box.maxX);
+            int minY = Mth.floor(box.minY);
+            int maxY = Mth.floor(box.maxY);
+            int minZ = Mth.floor(box.minZ);
+            int maxZ = Mth.floor(box.maxZ);
+
+            boolean landsOnFarmland = false;
+            for (int y = minY; y <= maxY; y++) {
+                for (int x = minX; x <= maxX; x++) {
+                    for (int z = minZ; z <= maxZ; z++) {
+                        BlockState state = level.getBlockState(new BlockPos(x, y, z));
+                        if (PlantClassifier.isFarmland(state)) {
+                            landsOnFarmland = true;
+                            break;
+                        }
+                    }
+                    if (landsOnFarmland) break;
+                }
+                if (landsOnFarmland) break;
+            }
+
+            if (landsOnFarmland) {
+                living.resetFallDistance();
+            }
         }
     }
 
