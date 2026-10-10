@@ -1,4 +1,4 @@
-# 🌾 Vein Farming: Universal Crop Harvester
+# 🌾 Vein Farming: Universal Farming QoL Toolkit
 
 [![NeoForge](https://img.shields.io/badge/NeoForge-1.21.1-orange.svg)](https://neoforged.net/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -180,7 +180,7 @@ The codebase follows a decoupled, high-performance modular architecture:
 ### 🖥️ Native In-Game Configuration GUI
 No third-party configuration mods (like *Configured* or *Cloth Config*) required!
 * Go to Minecraft's **Mods** menu (`Esc` -> `Mods`).
-* Select **Vein Farming: Universal Crop Harvester**.
+* Select **Vein Farming: Universal Farming QoL Toolkit**.
 * Click the **Config** button.
 * An authentic, clean vanilla Minecraft style menu opens with interactive sliders and toggle switches.
 * Frequently adjusted gameplay settings appear prominently at the top:
