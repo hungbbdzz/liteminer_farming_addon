@@ -1051,7 +1051,9 @@ public class PlantingAlgorithms {
         fallbackCandidates.sort(Comparator.comparingInt(pos -> pos.distManhattan(clickedPos)));
         candidatePositions.addAll(fallbackCandidates);
 
-        // 7. Greedy Selection with Strict Minimum Spacing Enforcement (Layer 2)
+        // 7. Greedy Selection - Pass 1: Strict Minimum Spacing Grid (Highest Priority)
+        // Strictly enforces minSpacing (default 8 blocks) against all existing world water
+        // and newly selected water holes. Preserves maximum farmland surface without redundant overlap.
         Set<BlockPos> covered = new HashSet<>();
         List<BlockPos> selectedHoles = new ArrayList<>();
 
@@ -1112,6 +1114,92 @@ public class PlantingAlgorithms {
                 int dx = Math.abs(u.getX() - bestChoice.getX());
                 int dz = Math.abs(u.getZ() - bestChoice.getZ());
                 int dy = bestChoice.getY() - u.getY();
+                if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
+                    covered.add(u);
+                }
+            }
+        }
+
+        // 8. Full Coverage Rescue - Pass 2: Guarantee All Farmland Irrigated
+        // If Pass 1 left orphan/dead-zone farmland unhydrated (e.g. narrow peninsulas, irregular edges,
+        // or pockets surrounded by existing water at distance 5-7), gracefully place rescue water holes
+        // to ensure 100% of the farmland is hydrated without leaving dry dead dirt.
+        int rescueMinSpacing = 4; // Start with minimum 4 blocks separation (at least 3 farmland blocks between water holes)
+        while (selectedHoles.size() < maxWaterHoles && covered.size() < unhydrated.size()) {
+            BlockPos bestRescue = null;
+            int maxNewlyCovered = 0;
+            int bestMinDistToWater = -1;
+            double bestDistToCenter = Double.MAX_VALUE;
+
+            for (BlockPos cand : tilledPositions) {
+                if (selectedHoles.contains(cand)) {
+                    continue;
+                }
+                if (!level.getBlockState(cand.below()).isSolid()) {
+                    continue;
+                }
+
+                // Minimum sanity distance: never place water right next to another water hole
+                if (isTooCloseToWater(cand, existingWorldWaters, rescueMinSpacing)
+                        || isTooCloseToWater(cand, selectedHoles, rescueMinSpacing)) {
+                    continue;
+                }
+
+                // Count unhydrated blocks this rescue candidate covers
+                int newlyCovered = 0;
+                for (BlockPos u : unhydrated) {
+                    if (!covered.contains(u)) {
+                        int dx = Math.abs(u.getX() - cand.getX());
+                        int dz = Math.abs(u.getZ() - cand.getZ());
+                        int dy = cand.getY() - u.getY();
+                        if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
+                            newlyCovered++;
+                        }
+                    }
+                }
+
+                if (newlyCovered > 0) {
+                    // Calculate Chebyshev distance to nearest water source to maximize spacing
+                    int minDistToWater = Integer.MAX_VALUE;
+                    for (BlockPos w : existingWorldWaters) {
+                        minDistToWater = Math.min(minDistToWater, Math.max(Math.abs(cand.getX() - w.getX()), Math.abs(cand.getZ() - w.getZ())));
+                    }
+                    for (BlockPos w : selectedHoles) {
+                        minDistToWater = Math.min(minDistToWater, Math.max(Math.abs(cand.getX() - w.getX()), Math.abs(cand.getZ() - w.getZ())));
+                    }
+
+                    double distToClicked = cand.distSqr(clickedPos);
+
+                    // Ranking criteria:
+                    // 1. Maximize newly covered unhydrated blocks
+                    // 2. Maximize distance to closest water (centers the hole in the dead zone, furthest from existing water)
+                    // 3. Minimize distance to clicked position
+                    if (newlyCovered > maxNewlyCovered
+                            || (newlyCovered == maxNewlyCovered && minDistToWater > bestMinDistToWater)
+                            || (newlyCovered == maxNewlyCovered && minDistToWater == bestMinDistToWater && distToClicked < bestDistToCenter)) {
+                        maxNewlyCovered = newlyCovered;
+                        bestMinDistToWater = minDistToWater;
+                        bestDistToCenter = distToClicked;
+                        bestRescue = cand;
+                    }
+                }
+            }
+
+            if (bestRescue == null || maxNewlyCovered == 0) {
+                // If rescueMinSpacing = 4 couldn't find a spot (e.g. an extremely narrow 1-wide pocket),
+                // step down to 3 or 2 to guarantee irrigation
+                if (rescueMinSpacing > 2) {
+                    rescueMinSpacing--;
+                    continue;
+                }
+                break;
+            }
+
+            selectedHoles.add(bestRescue);
+            for (BlockPos u : unhydrated) {
+                int dx = Math.abs(u.getX() - bestRescue.getX());
+                int dz = Math.abs(u.getZ() - bestRescue.getZ());
+                int dy = bestRescue.getY() - u.getY();
                 if (dx <= 4 && dz <= 4 && dy >= 0 && dy <= 1) {
                     covered.add(u);
                 }
