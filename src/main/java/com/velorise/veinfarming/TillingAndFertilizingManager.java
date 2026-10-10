@@ -193,6 +193,13 @@ public class TillingAndFertilizingManager {
             if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
                 FTBUltimineCompat.applyPostUltimineCosts(player, tilledCount + waterHolesPlaced);
             }
+            ModAdvancements.award(player, ModAdvancements.ROOT);
+            if (waterHolesPlaced > 0) {
+                ModAdvancements.award(player, ModAdvancements.CIVIL_ENGINEER);
+            }
+            if (!player.isCreative() && preventBreaking && !hoeStack.isEmpty() && hoeStack.getDamageValue() >= hoeStack.getMaxDamage() - 1) {
+                ModAdvancements.award(player, ModAdvancements.LIVING_ON_EDGE);
+            }
             return true;
         }
 
@@ -328,6 +335,7 @@ public class TillingAndFertilizingManager {
             if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
                 FTBUltimineCompat.applyPostUltimineCosts(player, fertilizedCount);
             }
+            ModAdvancements.award(player, ModAdvancements.ROOT);
             return true;
         }
 
@@ -379,6 +387,9 @@ public class TillingAndFertilizingManager {
 
         if (spawnedCount > 0) {
             level.levelEvent(1505, originPos, 15);
+            if (player instanceof ServerPlayer sp) {
+                ModAdvancements.award(sp, ModAdvancements.BEDROCK_FLOWER);
+            }
             return true;
         }
         return false;
@@ -646,6 +657,13 @@ public class TillingAndFertilizingManager {
         }
 
         serverLevel.sendParticles(ParticleTypes.COMPOSTER, composterPos.getX() + 0.5, composterPos.getY() + 0.8, composterPos.getZ() + 0.5, 12, 0.25, 0.2, 0.25, 0.05);
+
+        if (consumed > 0) {
+            ModAdvancements.award(player, ModAdvancements.ROOT);
+            if (consumed >= 16 || producedBoneMeal >= 3) {
+                ModAdvancements.award(player, ModAdvancements.SPEEDRUN_COMPOST);
+            }
+        }
 
         player.swing(hand, true);
         return true;

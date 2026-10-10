@@ -103,6 +103,7 @@ public class FarmingEventHandler {
                     }
                     level.playSound(null, clickedPos, SoundEvents.BONE_MEAL_USE, SoundSource.BLOCKS, 1.0F, 1.0F);
                     serverPlayer.swing(hand, true);
+                    ModAdvancements.award(serverPlayer, ModAdvancements.BEDROCK_FLOWER);
                     event.setCancellationResult(InteractionResult.SUCCESS);
                     event.setCanceled(true);
                     return;

@@ -1,0 +1,23 @@
+{
+  "parent": "vein_farming:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:carrot"
+    },
+    "title": {
+      "translate": "advancements.vein_farming.crop_rotation_genius.title"
+    },
+    "description": {
+      "translate": "advancements.vein_farming.crop_rotation_genius.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

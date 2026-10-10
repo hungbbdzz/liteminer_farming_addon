@@ -1,0 +1,23 @@
+{
+  "parent": "vein_farming:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:composter"
+    },
+    "title": {
+      "translate": "advancements.vein_farming.speedrun_composting.title"
+    },
+    "description": {
+      "translate": "advancements.vein_farming.speedrun_composting.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

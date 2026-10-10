@@ -208,6 +208,13 @@ public class PlantingManager {
             if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
                 FTBUltimineCompat.applyPostUltimineCosts(player, plantedCount);
             }
+            ModAdvancements.award(player, ModAdvancements.ROOT);
+            if (isIntercropping && plantedCount >= 4) {
+                ModAdvancements.award(player, ModAdvancements.CROP_ROTATION);
+            }
+            if (PlantClassifier.isSapling(seedStack) && plantedCount >= 4) {
+                ModAdvancements.award(player, ModAdvancements.LORAX);
+            }
             return true;
         }
 
@@ -316,6 +323,7 @@ public class PlantingManager {
             if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
                 FTBUltimineCompat.applyPostUltimineCosts(player, plantedCount);
             }
+            ModAdvancements.award(player, ModAdvancements.ROOT);
             return true;
         }
         return false;

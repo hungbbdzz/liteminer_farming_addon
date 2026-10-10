@@ -1,0 +1,23 @@
+{
+  "parent": "vein_farming:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:spruce_sapling"
+    },
+    "title": {
+      "translate": "advancements.vein_farming.the_lorax_approves.title"
+    },
+    "description": {
+      "translate": "advancements.vein_farming.the_lorax_approves.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

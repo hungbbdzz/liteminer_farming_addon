@@ -1,0 +1,23 @@
+{
+  "parent": "vein_farming:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:golden_hoe"
+    },
+    "title": {
+      "translate": "advancements.vein_farming.living_on_the_edge.title"
+    },
+    "description": {
+      "translate": "advancements.vein_farming.living_on_the_edge.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

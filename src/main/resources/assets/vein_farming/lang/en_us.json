@@ -17,5 +17,23 @@
   "config.vein_farming.clear_foliage": "Clear Replaceable Foliage when Hoeing",
   "config.vein_farming.smart_water_bucket_irrigation": "Water Bucket Irrigation",
   "config.vein_farming.exhaustion_per_block": "Exhaustion Per Block",
-  "config.vein_farming.bedrock_flower_bonemeal": "Bedrock-style Flower Bone Meal Propagation"
+  "config.vein_farming.bedrock_flower_bonemeal": "Bedrock-style Flower Bone Meal Propagation",
+
+  "advancements.vein_farming.root.title": "It Ain't Much, But It's Honest Work",
+  "advancements.vein_farming.root.description": "Perform your first mass farming action with Vein Farming.",
+  "advancements.vein_farming.is_it_bedrock.title": "Is it Bedrock?",
+  "advancements.vein_farming.is_it_bedrock.description": "Duplicate a small flower with Bone Meal... wait, since when can we do this in Java?!",
+  "advancements.vein_farming.civil_engineer.title": "Civil Engineer",
+  "advancements.vein_farming.civil_engineer.description": "Irrigate a field by holding a Hoe and Water Bucket, automatically digging 8-block spaced water wells.",
+  "advancements.vein_farming.crop_rotation_genius.title": "Crop Rotation Genius",
+  "advancements.vein_farming.crop_rotation_genius.description": "Plant alternating parallel rows of crops by holding different seeds in each hand for 200% growth speed.",
+  "advancements.vein_farming.the_lorax_approves.title": "The Lorax Approves",
+  "advancements.vein_farming.the_lorax_approves.description": "Plant a spacious sapling orchard or a 2x2 mega tree grove using smart spacing.",
+  "advancements.vein_farming.speedrun_composting.title": "Speedrun Composting",
+  "advancements.vein_farming.speedrun_composting.description": "Shift-click a Composter with seeds or compostables to convert entire stacks into Bone Meal instantly.",
+  "advancements.vein_farming.living_on_the_edge.title": "Living on the Edge",
+  "advancements.vein_farming.living_on_the_edge.description": "Have your farming tool saved from breaking at exactly 1 durability.",
+  "advancements.vein_farming.lazy_farmer_3000.title": "Lazy Farmer 3000",
+  "advancements.vein_farming.lazy_farmer_3000.description": "Harvest 64 or more mature crops in a single instant click."
 }
+

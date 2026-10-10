@@ -457,6 +457,13 @@ public class HarvestManager {
             if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
                 FTBUltimineCompat.applyPostUltimineCosts(player, harvestedCount);
             }
+            ModAdvancements.award(player, ModAdvancements.ROOT);
+            if (harvestedCount >= 64) {
+                ModAdvancements.award(player, ModAdvancements.LAZY_FARMER);
+            }
+            if (!player.isCreative() && preventBreaking && !heldItem.isEmpty() && heldItem.isDamageableItem() && heldItem.getDamageValue() >= heldItem.getMaxDamage() - 1) {
+                ModAdvancements.award(player, ModAdvancements.LIVING_ON_EDGE);
+            }
             return true;
         }
 
@@ -567,6 +574,10 @@ public class HarvestManager {
             player.swing(hand, true);
             if (FTBUltimineCompat.isFTBUltimineLoaded() && FTBUltimineCompat.isUltimineActive(player)) {
                 FTBUltimineCompat.applyPostUltimineCosts(player, destroyedCount);
+            }
+            ModAdvancements.award(player, ModAdvancements.ROOT);
+            if (!player.isCreative() && preventBreaking && !heldItem.isEmpty() && heldItem.isDamageableItem() && heldItem.getDamageValue() >= heldItem.getMaxDamage() - 1) {
+                ModAdvancements.award(player, ModAdvancements.LIVING_ON_EDGE);
             }
             return true;
         }

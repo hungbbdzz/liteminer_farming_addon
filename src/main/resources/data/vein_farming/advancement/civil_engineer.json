@@ -1,0 +1,23 @@
+{
+  "parent": "vein_farming:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:water_bucket"
+    },
+    "title": {
+      "translate": "advancements.vein_farming.civil_engineer.title"
+    },
+    "description": {
+      "translate": "advancements.vein_farming.civil_engineer.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "trigger": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}
