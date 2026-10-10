@@ -43,6 +43,8 @@ Tired of manually digging water holes and placing buckets to hydrate massive far
 * **Resource Consumption:** Consumes 1 water source per placed water hole (from off-hand first, then player inventory). In Creative Mode, water is infinite.
 * **Real-Time Preview:** When standalone preview is active, intended water holes are rendered in **Azure Cyan wireframe**!
 
+![Area Tilling & Smart Irrigation](docs/assets/aoe_hoe_and_plant.gif)
+
 ---
 
 ### 🌱 3. Smart Mass Planting (Seeds & Crops)
@@ -77,6 +79,8 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
    * Automatically synchronizes row parity with existing planted crops in the farm.
    * Fruit seeds (Melon/Pumpkin) are strictly excluded from being forced into intercropping.
 
+![Contextual Intercropping](docs/assets/intercropping.gif)
+
 ---
 
 ### 🦴 4. AOE Bone Meal (Smart Fertilizing & Flower Propagation)
@@ -100,6 +104,8 @@ Right-click on Farmland, Sand, Soul Sand, End Stone, or Jungle Logs to carpet-pl
 * **Chorus Tree Traversal:** Gathers Chorus Fruit and Flowers across 3D branches while replanting a Chorus Flower on the End Stone base.
 * **🔪 Farmer's Delight Knife Compatibility:** Harvesting crops with a knife drops Straw with Fortune scaling!
 * **Direct-to-Inventory & Drop Aggregation:** Harvested items can be placed directly into your inventory or neatly merged into compact stacks right at your feet.
+
+![Mass Harvesting & Auto Replanting](docs/assets/aoe_harvest.gif)
 
 ---
 
@@ -194,6 +200,8 @@ No third-party configuration mods (like *Configured* or *Cloth Config*) required
   - **Clear Replaceable Foliage when Hoeing** (Toggle, default: ON)
   - **Prevent Tool Breaking** (Toggle, default: ON)
 * Features **Reset Defaults**, **Cancel**, and **Done** buttons with instant persistence.
+
+![Native Config GUI](docs/assets/setting_ui.png)
 
 ### 📄 Configuration File
 The configuration is saved automatically at `.minecraft/config/vein_farming-common.toml`:
